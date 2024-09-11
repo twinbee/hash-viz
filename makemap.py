@@ -148,7 +148,7 @@ def create_map(addresses):
     
     return valid_addresses, m
 
-def main(directory):
+def main(directory, kennel_filter=None):
     geolocator = Nominatim(user_agent="Hash House Harriers calendar map", timeout=3)
     addresses = {}
     total_rows_processed = 0
@@ -177,6 +177,9 @@ def main(directory):
         found_addresses, found_map_links = extract_addresses(text)
         total_rows_processed += len(found_addresses)
         for (kennel, title, date, address, run), map_link in zip(found_addresses, found_map_links):
+            if kennel_filter and kennel_filter.lower() not in kennel.lower():
+                continue  # Skip rows that do not match the kennel filter
+            
             if address.strip():
                 coords = None
                 
@@ -215,5 +218,6 @@ def main(directory):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process a directory of TSV files containing addresses.")
     parser.add_argument('directory', type=str, help="Path to the directory containing the TSV files.")
+    parser.add_argument('--kennel', type=str, help="Filter by specific kennel (case insensitive).", default=None)
     args = parser.parse_args()
-    main(args.directory)
+    main(args.directory, args.kennel)
