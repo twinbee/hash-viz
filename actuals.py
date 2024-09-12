@@ -2,9 +2,38 @@ import os
 import csv
 import sys
 from datetime import datetime
+from difflib import SequenceMatcher
 
 # Ensure the script uses UTF-8 encoding for output
 sys.stdout.reconfigure(encoding='utf-8')
+
+def levenshtein_ratio(s1, s2):
+    """Compute the Levenshtein ratio between two strings."""
+    return SequenceMatcher(None, s1, s2).ratio()
+
+def group_kennels_by_similarity(kennel_names):
+    """Group kennels by similar spelling and phonetic similarity."""
+    grouped_kennels = {}
+    kennel_list = list(kennel_names)
+
+    for kennel in kennel_list:
+        found_group = False
+        for group in grouped_kennels.keys():
+            if levenshtein_ratio(group, kennel) > 0.8:  # Threshold for similarity
+                grouped_kennels[group].add(kennel)
+                found_group = True
+                break
+
+        if not found_group:
+            grouped_kennels[kennel] = {kennel}
+
+    # Merge grouped kennel names
+    merged_groups = {}
+    for group, similar_names in grouped_kennels.items():
+        representative = sorted(similar_names, key=lambda x: len(x))[0]  # Pick the shortest name
+        merged_groups[representative] = similar_names
+
+    return merged_groups
 
 def is_event_exempt(description):
     """
@@ -45,8 +74,8 @@ def process_file(filepath, kennels_data):
                 print(f"Skipping row with invalid date: {row}")
                 continue
 
-            kennel = row[1]
-            
+            kennel = row[1].strip()  # Kennel name is in the 2nd column (index 1)
+
             # Attempt to parse the RUN number, handle cases where it's missing or invalid
             try:
                 run_number = int(row[4])  # RUN is in the 5th column (index 4)
@@ -77,7 +106,12 @@ def process_file(filepath, kennels_data):
                 expected_run_number = kennel_data['expected_run_number'] + 1
                 if run_number != expected_run_number:
                     kennel_data['errors'] += 1
-                    print(f"[ERROR] {kennel} - Expected RUN {expected_run_number}, found {run_number} on {date_str}")
+                    if run_number < kennel_data['last_run_number']:
+                        print(f"[ALERT] {kennel} - RUN number went backwards from {kennel_data['last_run_number']} to {run_number} on {date_str}")
+                    elif run_number == kennel_data['last_run_number']:
+                        print(f"[ALERT] {kennel} - RUN number stayed the same at {run_number} on {date_str}")
+                    elif run_number > expected_run_number:
+                        print(f"[ALERT] {kennel} - RUN number incremented by more than +1 (Expected: {expected_run_number}, Found: {run_number}) on {date_str}")
 
                 # Update the last recorded RUN number and expected RUN number
                 kennel_data['last_run_number'] = run_number
@@ -93,9 +127,11 @@ def generate_report(kennels_data):
     Args:
         kennels_data (dict): Dictionary containing the actual RUN data for each kennel.
     """
+    grouped_kennels = group_kennels_by_similarity(kennels_data.keys())
     print("\n=== Actual RUN Numbers Report ===\n")
-    for kennel, data in kennels_data.items():
-        print(f"Kennel: {kennel}")
+    for representative, kennel_names in grouped_kennels.items():
+        print(f"Kennel Group: {', '.join(kennel_names)}")
+        data = kennels_data[representative]
         print(f"  Total Entries Processed: {len(data['rows'])}")
         print(f"  Total Exempted Events (Cancelled/Drinking Practice/Happy Hour): {data['cancelled_or_practice']}")
         print(f"  Total Errors (RUN number discrepancies): {data['errors']}")
@@ -109,9 +145,10 @@ def generate_report(kennels_data):
             print(f"    Date: {row_date.strftime('%Y-%m-%d')}, RUN: {run_number}, Status: {event_status}, Description: {description}")
         print("\n")
 
-    print("=== Summary of Last Reported and Expected RUN Numbers for Each Kennel ===\n")
-    for kennel, data in kennels_data.items():
-        print(f"Kennel: {kennel}")
+    print("=== Summary of Last Reported and Expected RUN Numbers for Each Kennel Group ===\n")
+    for representative, kennel_names in grouped_kennels.items():
+        data = kennels_data[representative]
+        print(f"Kennel Group: {', '.join(kennel_names)}")
         print(f"  Last Reported RUN Number: {data['last_run_number']}")
         print(f"  Expected/Calculated RUN Number: {data['expected_run_number']}\n")
 
