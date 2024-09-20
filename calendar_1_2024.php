@@ -48,6 +48,7 @@ if (d.getYear() % 100 == 24) document.write('<style type="text/css" media="scree
                     </tr>
                     <!-- Events will go here -->
                     <tr>
+	<td class="empty"></td>
 	<td class="day">
                             <table class="inner" id="j101">
                                 <tr>
@@ -428,10 +429,6 @@ if (d.getYear() % 100 == 24) document.write('<style type="text/css" media="scree
                                 </tr>
                             </table>
                         </td>
-	<td class="empty"></td>
-	<td class="empty"></td>
-	<td class="empty"></td>
-	<td class="empty"></td>
 </tr>
 
                 </table>
