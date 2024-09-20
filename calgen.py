@@ -2,6 +2,7 @@ import os
 import calendar
 from datetime import datetime, timedelta
 import argparse
+from datetime import datetime, timezone
 
 # Specification block for initial date and run numbers for each kennel
 kennel_specs = {
@@ -41,7 +42,7 @@ def calculate_next_event(kennel, start_date, current_date, frequency):
     return next_event
 
 # Function to generate TSV event data for each month based on the rules
-def generate_tsv_events(month, year):
+def generate_tsv_events(month, year, kennel_run_numbers):
     events = []
     start_of_month = datetime(year, month, 1)
     end_of_month = datetime(year, month, calendar.monthrange(year, month)[1])
@@ -49,7 +50,7 @@ def generate_tsv_events(month, year):
     # Iterate through each kennel to generate events for the month
     for kennel, spec in kennel_specs.items():
         start_date = spec["initial_date"]
-        run_number = spec["run_number"]
+        run_number = kennel_run_numbers[kennel]  # Continue from the last run number
         rule = kennel_rules[kennel]
         
         current_date = start_of_month
@@ -76,22 +77,31 @@ def generate_tsv_events(month, year):
                     "update": next_event.strftime("%m/%d/%Y %H:%M")
                 }
                 events.append(event)
-                run_number += 1
+                run_number += 1  # Increment the run number after each event
             
             # Increment the current date after processing for this kennel
             current_date += timedelta(days=1)
+    
+        # Update the global run number for this kennel
+        kennel_run_numbers[kennel] = run_number
     
     # Sort events by date
     events.sort(key=lambda x: x['date'])
     return events
 
-# Function to generate TSV format content (Android .txt file)
+# Function to generate TSV format content ("android" .txt file)
 def generate_tsv_file(month, year, events):
     header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE"
     rows = [header]
+
+    # Capture the current UTC time for the "UPDATE" column
+    current_utc_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
+
     for event in events:
-        row = f"{event['day']}\t{event['kennel']}\t{event.get('icon', '')}\t{event['title']}\t{event['run']}\t{event['hares']}\t{event['time']}\t{event['start']}\t{event['map']}\t{event['hashcash']}\t{event['turds']}\t{event['tweet']}\t{event['twilight']}\t{event['date'].strftime('%A, %B %d, %Y')}\t{event['desc']}\t{event['update']}"
+        update_info = f"(calgen 1.0) {current_utc_time}"
+        row = f"{event['day']}\t{event['kennel']}\t{event.get('icon', '')}\t{event['title']}\t{event['run']}\t{event['hares']}\t{event['time']}\t{event['start']}\t{event['map']}\t{event['hashcash']}\t{event['turds']}\t{event['tweet']}\t{event['twilight']}\t{event['date'].strftime('%A, %B %d, %Y')}\t{event['desc']}\t{update_info}"
         rows.append(row)
+    
     return "\n".join(rows)
 
 # Function to generate a PHP calendar file template for a specific month and year
@@ -206,7 +216,7 @@ def generate_event_rows(month, year):
     return "".join(rows)
 
 # Function to generate both TSV and PHP files for a month
-def generate_files_for_month(month, year):
+def generate_files_for_month(month, year, kennel_run_numbers):
     # Generate previous and next month links for PHP
     previous_month = (month - 1) if month > 1 else 12
     previous_year = year if month > 1 else year - 1
@@ -216,7 +226,7 @@ def generate_files_for_month(month, year):
     previous_month_link = f"$calendar/{previous_year}/{str(previous_month).zfill(2)}_{previous_year}.php"
     next_month_link = f"$calendar/{next_year}/{str(next_month).zfill(2)}_{next_year}.php"
 
-    events = generate_tsv_events(month, year)
+    events = generate_tsv_events(month, year, kennel_run_numbers)
 
     # Generate TSV (Android) file
     tsv_content = generate_tsv_file(month, year, events)
@@ -236,8 +246,11 @@ def generate_files_for_month(month, year):
 
 # Main function to generate files for an entire year
 def generate_files_for_year(year):
+    # Initialize run numbers for each kennel
+    kennel_run_numbers = {kennel: spec["run_number"] for kennel, spec in kennel_specs.items()}
+
     for month in range(1, 13):
-        php_file_path, tsv_file_path = generate_files_for_month(month, year)
+        php_file_path, tsv_file_path = generate_files_for_month(month, year, kennel_run_numbers)
         print(f"Generated: {php_file_path} and {tsv_file_path}")
 
 if __name__ == "__main__":
