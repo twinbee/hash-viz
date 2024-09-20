@@ -1,5 +1,7 @@
-from datetime import datetime, timedelta
+import os
 import calendar
+from datetime import datetime, timedelta
+import argparse
 
 # Specification block for initial date and run numbers for each kennel
 kennel_specs = {
@@ -83,7 +85,7 @@ def generate_tsv_events(month, year):
     events.sort(key=lambda x: x['date'])
     return events
 
-# Function to generate TSV format content
+# Function to generate TSV format content (Android .txt file)
 def generate_tsv_file(month, year, events):
     header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE"
     rows = [header]
@@ -159,24 +161,20 @@ if (d.getYear() % 100 == {str(year)[-2:]}) document.write('<style type="text/css
 """
     return php_content
 
+# Function to generate event rows for the PHP file
 def generate_event_rows(month, year):
-    # Get the day of the week of the 1st day of the month and the number of days in the month
     first_day_of_week, days_in_month = calendar.monthrange(year, month)  # 0=Monday, 6=Sunday
     rows = []
-
-    # Start generating the calendar row by row
     current_row = '<tr>\n'
-
-    # Add empty cells before the first day of the month (Sunday is 6, so we need to map 0=Monday to 1=Sunday)
-    for _ in range(first_day_of_week + 1):
+    
+    # Add empty cells before the first day of the month
+    for _ in range(first_day_of_week):
         current_row += '\t<td class="empty"></td>\n'
 
-    # Start from the 1st of the month
     day_counter = 1
 
     # Fill in the rest of the days for the current row
     while day_counter <= days_in_month:
-        # Add a day cell
         current_row += f'''\t<td class="day">
                             <table class="inner" id="j{month}{str(day_counter).zfill(2)}">
                                 <tr>
@@ -189,7 +187,6 @@ def generate_event_rows(month, year):
                                 </tr>
                             </table>
                         </td>\n'''
-        # Move to the next day
         day_counter += 1
 
         # If the current row is full (7 columns), close it and start a new row
@@ -208,29 +205,46 @@ def generate_event_rows(month, year):
 
     return "".join(rows)
 
-
 # Function to generate both TSV and PHP files for a month
-def generate_files_for_month(month, year, previous_month_link, next_month_link, events):
+def generate_files_for_month(month, year):
+    # Generate previous and next month links for PHP
+    previous_month = (month - 1) if month > 1 else 12
+    previous_year = year if month > 1 else year - 1
+    next_month = (month + 1) if month < 12 else 1
+    next_year = year if month < 12 else year + 1
+
+    previous_month_link = f"$calendar/{previous_year}/{str(previous_month).zfill(2)}_{previous_year}.php"
+    next_month_link = f"$calendar/{next_year}/{str(next_month).zfill(2)}_{next_year}.php"
+
+    events = generate_tsv_events(month, year)
+
+    # Generate TSV (Android) file
     tsv_content = generate_tsv_file(month, year, events)
-    # The events are no longer needed in the php_content generation since the PHP handles it dynamically
-    php_content = generate_php_file(month, year, previous_month_link, next_month_link)
-    
-    # File paths
-    tsv_file_path = f"calendar_{month}_{year}.tsv"
-    php_file_path = f"calendar_{month}_{year}.php"
-    
-    # Write TSV file
+    tsv_file_path = f"android/{year}-{str(month).zfill(2)}.txt"
+    os.makedirs(os.path.dirname(tsv_file_path), exist_ok=True)
     with open(tsv_file_path, 'w') as tsv_file:
         tsv_file.write(tsv_content)
-    
-    # Write PHP file
+
+    # Generate PHP file
+    php_content = generate_php_file(month, year, previous_month_link, next_month_link)
+    php_file_path = f"calendar/{year}/$calendar_{str(month).zfill(2)}_{year}.php"
+    os.makedirs(os.path.dirname(php_file_path), exist_ok=True)
     with open(php_file_path, 'w') as php_file:
         php_file.write(php_content)
-    
+
     return php_file_path, tsv_file_path
 
-# Sample execution: Generate files for January 2024
-sample_events = generate_tsv_events(1, 2024)
-php_file_path, tsv_file_path = generate_files_for_month(1, 2024, "$12-2023.php", "$02-2024.php", sample_events)
+# Main function to generate files for an entire year
+def generate_files_for_year(year):
+    for month in range(1, 13):
+        php_file_path, tsv_file_path = generate_files_for_month(month, year)
+        print(f"Generated: {php_file_path} and {tsv_file_path}")
 
-(php_file_path, tsv_file_path)  # Display the paths for the user
+if __name__ == "__main__":
+    # Argument parser to get year input from the command line
+    parser = argparse.ArgumentParser(description="Generate calendar and android files for the given year.")
+    parser.add_argument("year", type=int, help="The year for which to generate the files (e.g., 2038).")
+    args = parser.parse_args()
+
+    # Generate files for the input year
+    generate_files_for_year(args.year)
