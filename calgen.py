@@ -24,6 +24,17 @@ kennel_rules = {
     "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"}
 }
 
+# Storing the icon information for each kennel
+kennel_icons = {
+    "Dallas Urban Hash": "DUMB.png",
+    "NODUH Hash": "NoDHHH2.png",
+    "Dallas Hash": "dallas.png",
+    "Ft Worth Hash": "ftworth.png",
+    "Full Moon Hash": "fullmoon.png"
+}
+
+
+
 # Function to calculate next event based on frequency
 def calculate_next_event(kennel, start_date, current_date, frequency):
     if frequency == "weekly":
@@ -89,7 +100,7 @@ def generate_tsv_events(month, year, kennel_run_numbers):
     events.sort(key=lambda x: x['date'])
     return events
 
-# Function to generate TSV format content ("android" .txt file)
+# Function to generate TSV format content (Android .txt file)
 def generate_tsv_file(month, year, events):
     header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE"
     rows = [header]
@@ -98,11 +109,15 @@ def generate_tsv_file(month, year, events):
     current_utc_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
 
     for event in events:
+        # Retrieve the correct icon for the kennel
+        icon = kennel_icons.get(event['kennel'], "")
+        
         update_info = f"(calgen 1.0) {current_utc_time}"
-        row = f"{event['day']}\t{event['kennel']}\t{event.get('icon', '')}\t{event['title']}\t{event['run']}\t{event['hares']}\t{event['time']}\t{event['start']}\t{event['map']}\t{event['hashcash']}\t{event['turds']}\t{event['tweet']}\t{event['twilight']}\t{event['date'].strftime('%A, %B %d, %Y')}\t{event['desc']}\t{update_info}"
+        row = f"{event['day']}\t{event['kennel']}\t{icon}\t{event['title']}\t{event['run']}\t{event['hares']}\t{event['time']}\t{event['start']}\t{event['map']}\t{event['hashcash']}\t{event['turds']}\t{event['tweet']}\t{event['twilight']}\t{event['date'].strftime('%A, %B %d, %Y')}\t{event['desc']}\t{update_info}"
         rows.append(row)
     
     return "\n".join(rows)
+
 
 # Function to generate a PHP calendar file template for a specific month and year
 def generate_php_file(month, year, previous_month_link, next_month_link):
@@ -171,9 +186,16 @@ if (d.getYear() % 100 == {str(year)[-2:]}) document.write('<style type="text/css
 """
     return php_content
 
+from datetime import date
+
+# Helper function to get the day of the week for a specific date
+def get_day_of_week(year, month, day):
+    return date(year, month, day).weekday()  # Returns 0 for Monday, 6 for Sunday
+
 # Function to generate event rows for the PHP file
 def generate_event_rows(month, year):
-    first_day_of_week, days_in_month = calendar.monthrange(year, month)  # 0=Monday, 6=Sunday
+    first_day_of_week = get_day_of_week(year, month, 1)  # Get the weekday for the 1st of the month
+    days_in_month = calendar.monthrange(year, month)[1]  # Get the number of days in the month
     rows = []
     current_row = '<tr>\n'
     
@@ -215,6 +237,7 @@ def generate_event_rows(month, year):
 
     return "".join(rows)
 
+
 # Function to generate both TSV and PHP files for a month
 def generate_files_for_month(month, year, kennel_run_numbers):
     # Generate previous and next month links for PHP
@@ -237,7 +260,7 @@ def generate_files_for_month(month, year, kennel_run_numbers):
 
     # Generate PHP file
     php_content = generate_php_file(month, year, previous_month_link, next_month_link)
-    php_file_path = f"calendar/{year}/$calendar_{str(month).zfill(2)}_{year}.php"
+    php_file_path = f"calendar/{year}/{str(month).zfill(2)}_{year}.php"
     os.makedirs(os.path.dirname(php_file_path), exist_ok=True)
     with open(php_file_path, 'w') as php_file:
         php_file.write(php_content)
