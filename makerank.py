@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from collections import defaultdict
 import fuzzy
 from unidecode import unidecode
+import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 # Define name aliases
 NAME_ALIASES = {
@@ -30,7 +33,10 @@ NAME_ALIASES = {
     'Foreplay': '4Play',
     '4Play': '4Play',
     '3 Strokes': '3 Strokes',
+    '3 Strokes': '3-Strokes',
     'Three Strokes': '3 Strokes',
+    'Three Strokes and Yer Done': '3 Strokes',
+    '3-Strokes and Yer Done': '3 Strokes',
     'WDT': 'Wrong Dong Thong',
     'Wrong Dong Thong': 'Wrong Dong Thong',
     'MFS': 'Martha F Stewart',
@@ -48,7 +54,7 @@ NAME_ALIASES = {
     
 }
 
-IGNORE_HARES = {'Team C U  Next Tue', 'Yer Done', 'Mr E Hare', '', ' '}
+IGNORE_HARES = {'Team C U  Next Tue', 'Mr E Hare', '', ' ', 'mystery co-hare', 'Mystery Co-Hare', 'Team H<3<', 'mystery hare', 'Mr. E Hare', 'open', 'OPEN', 'HARE NEEDED', 'CANCELED', 'CANCELLED' }
 
 def preprocess_name(name):
     # Remove unwanted substrings and preprocess the name
@@ -166,8 +172,8 @@ def plot_hare_names(normalized_names, most_frequent_names, all_name_matches, har
         plt.gca().invert_yaxis()
         plt.show()
 
-    # Plot top 50
-    top_50 = sorted_names[:50]
+    # Plot top 100
+    top_50 = sorted_names[:100]
     if top_50:
         names_50, counts_50 = zip(*top_50)
 
@@ -175,7 +181,7 @@ def plot_hare_names(normalized_names, most_frequent_names, all_name_matches, har
         plt.barh(names_50, counts_50, color='skyblue')
         plt.xlabel('Count')
         plt.ylabel('Hare Names')
-        plt.title(f'Top 50 Hares ({os.path.basename(directory)})')
+        plt.title(f'Top Hares ({os.path.basename(directory)})')
         plt.gca().invert_yaxis()
         plt.show()
 
@@ -213,7 +219,9 @@ def main(directory):
 
 
 if __name__ == '__main__':
-    directory = input("Enter the directory path: ")
-    # Ensure the directory path is handled as Unicode
-    directory = str(directory)
+    import sys
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <directory_path>")
+        sys.exit(1)
+    directory = sys.argv[1]
     main(directory)
