@@ -1,126 +1,191 @@
 import os
 import calendar
-from datetime import datetime, timedelta, date 
+from datetime import datetime, timedelta
 import argparse
-from datetime import timezone
-import sys 
+from datetime import datetime, timezone
+from datetime import date # Added for get_day_of_week helper
 
-# --- Configuration Blocks (Initial defaults - will be updated by CLI arguments) ---
+# Specification block for initial date and run numbers for each kennel
 kennel_specs = {
-    "Dallas Hash": {"initial_date": datetime(2024, 1, 6, 14, 0), "run_number": 1151},
-    "Ft Worth Hash": {"initial_date": datetime(2024, 1, 13, 14, 0), "run_number": 999},
-    "Dallas Urban Hash": {"initial_date": datetime(2024, 1, 3, 18, 30), "run_number": 731},
-    "NODUH Hash": {"initial_date": datetime(2024, 1, 8, 19, 0), "run_number": 319},
-    "YAKH3": {"initial_date": datetime(2024, 6, 2, 12, 0), "run_number": 1},
-    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25, 0, 0), "run_number": 63} 
+    "Dallas Hash": {"initial_date": datetime(2024, 1, 6), "run_number": 1151},
+    "Ft Worth Hash": {"initial_date": datetime(2024, 1, 13), "run_number": 999},
+    "Dallas Urban Hash": {"initial_date": datetime(2024, 1, 3), "run_number": 731},
+    "NODUH Hash": {"initial_date": datetime(2024, 1, 8), "run_number": 319},
+    "YAKH3": {"initial_date": datetime(2024, 6, 2), "run_number": 1},  # First Sunday in summer
+    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25), "run_number": 63}  # Reference date for calculation
 }
 
+# Hashcash and schedule rules for each kennel
 kennel_rules = {
     "Dallas Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$10.00 - Pay Online: Paypal $10", "day": "Saturday"},
     "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
     "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
     "NODUH Hash": {"frequency": "bi-weekly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"},
-    "YAKH3": {"frequency": "summer-sundays", "time": "12:00 PM", "hashcash": "", "day": "Sunday"},
+    "YAKH3": {"frequency": "summer-sundays", "time": "12:00 PM", "hashcash": "", "day": "Sunday"},  # Summer months only
     "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"}
 }
 
+# Helper dictionary to map rule["day"] name to Python's weekday() (0=Mon, 6=Sun)
+DAY_MAP = {
+    "Monday": 0, "Tuesday": 1, "Wednesday": 2, "Thursday": 3,
+    "Friday": 4, "Saturday": 5, "Sunday": 6
+}
+
+# List of month names for the yearly planning view (indexed 1-12)
+MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+# NEW FUNCTION FOR FULL MOON ICON RETRIEVAL
+def get_full_moon_icon(month):
+    """Returns the icon filename based on the month number (1-12)."""
+    return f"Calendar Icons-{str(month).zfill(2)}.png"
+
+# Storing the icon information for each kennel
 kennel_icons = {
     "Dallas Urban Hash": "DUMB.png",
     "NODUH Hash": "NoDHHH2.png",
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
-    "Full Moon Hash": "fullmoon.png"
+    # Use the function for the Full Moon Hash icon
+    "Full Moon Hash": get_full_moon_icon
 }
-# ---------------------------------------------------------------------------------
+
+# Helper function to get the day of the week for a specific date
+def get_day_of_week(year, month, day):
+    # Returns 0 for Monday, 6 for Sunday
+    return date(year, month, day).weekday()
+
+# =========================================================================
+# Full Moon Date Calculation
+# =========================================================================
+def calculate_full_moons_for_year(target_year):
+    """
+    Calculates approximate full moon dates for the target year using the mean synodic period.
+    The starting date is taken from the Full Moon Hash initial_date in kennel_specs.
+    """
+    # Reference full moon: Jan 25, 2024 (12:00 PM) from kennel_specs
+    REF_DATE = datetime(2024, 1, 25, 12)
+    SYNODIC_MONTH = 29.530588  # Mean synodic month in days
+
+    # 1. Determine the approximate number of lunations (N) from the REF_DATE to Jan 1 of the target year.
+    start_of_target_year = datetime(target_year, 1, 1)
+    days_to_target = (start_of_target_year - REF_DATE).total_seconds() / (60*60*24)
+    approx_lunations = round(days_to_target / SYNODIC_MONTH)
+
+    # 2. Calculate the estimated first full moon time *near* Jan 1 of the target year.
+    current_fm_time = REF_DATE + timedelta(days=approx_lunations * SYNODIC_MONTH)
+
+    # 3. Step backward one lunation to ensure we start *before* the first one in the target year.
+    while current_fm_time.year >= target_year:
+        current_fm_time -= timedelta(days=SYNODIC_MONTH)
+
+    # 4. Step forward, collecting all full moon dates that fall in the target year.
+    fm_dates_set = set()
+
+    for i in range(15): # 15 iterations covers 12-13 moons plus a buffer
+        current_fm_time += timedelta(days=SYNODIC_MONTH)
+
+        if current_fm_time.year == target_year:
+            fm_date = current_fm_time.date()
+            fm_dates_set.add((fm_date.month, fm_date.day))
+        elif current_fm_time.year > target_year:
+            break
+
+    return sorted(list(fm_dates_set))
+# =========================================================================
 
 
 # Function to calculate next event based on frequency
 def calculate_next_event(kennel, start_date, current_date, frequency):
-    """Calculates the next event date for a given kennel."""
-    delta = None
     if frequency == "weekly":
         delta = timedelta(weeks=1)
     elif frequency == "bi-weekly":
         delta = timedelta(weeks=2)
+    # The 'summer-sundays' logic relies on a 4-week cycle starting from initial_date
     elif frequency == "summer-sundays":
-        if current_date.month in [6, 7, 8] and current_date.weekday() == 6: # 6 is Sunday
-            # Use the start_date to determine *which* Sundays to run
-            if current_date.date() >= start_date.date():
-                # Check if it's on the correct weekly cycle from the start
-                days_diff = (current_date.date() - start_date.date()).days
-                if days_diff % 7 == 0: # It's on the right cycle
-                     return current_date
-            return None
-        return None
+        delta = timedelta(weeks=4)
     elif frequency == "full-moon":
-        # Placeholder for full-moon logic. 
+        return None
+    else:
         return None
 
-    if delta:
-        next_event = start_date
-        # Keep advancing the start_date until it's on or after the current_date
-        while next_event.date() < current_date.date():
-            next_event += delta
-        
-        # If the next event falls exactly on the current day, return it.
-        if next_event.date() == current_date.date():
-             return next_event
-        
-    return None
+    next_event = start_date
+    while next_event < current_date:
+        next_event += delta
+    return next_event
 
 # Function to generate TSV event data for each month based on the rules
-def generate_tsv_events(month, year, kennel_run_numbers, specs):
+def generate_tsv_events(month, year, kennel_run_numbers):
     events = []
-    start_of_month = datetime(year, month, 1, 0, 0)
-    days_in_month = calendar.monthrange(year, month)[1]
-    
-    # Create a list of all days in the month
-    all_dates = [datetime(year, month, day, 0, 0) for day in range(1, days_in_month + 1)]
+    start_of_month = datetime(year, month, 1)
+    end_of_month = datetime(year, month, calendar.monthrange(year, month)[1])
 
-    for kennel, spec in specs.items():
+    # Iterate through each kennel to generate events for the month
+    for kennel, spec in kennel_specs.items():
         start_date = spec["initial_date"]
         run_number = kennel_run_numbers[kennel]
         rule = kennel_rules[kennel]
-        
-        for current_date_iterator in all_dates:
-            # We must pass the time component from the original start_date
-            event_time = datetime(
-                current_date_iterator.year, 
-                current_date_iterator.month, 
-                current_date_iterator.day, 
-                start_date.hour, 
-                start_date.minute
-            )
-            
-            next_event = calculate_next_event(kennel, start_date, event_time, rule["frequency"])
-            
-            if (next_event and next_event.date() == current_date_iterator.date() and 
-                not any(e['date'].date() == next_event.date() and e['kennel'] == kennel for e in events)):
 
-                # Calculate the run number for this specific event date
-                current_run_number = 0
-                if rule["frequency"] in ["weekly", "bi-weekly"]:
-                    # Calculate weeks (or bi-weeks) passed since the initial date
-                    time_diff = next_event.date() - start_date.date()
-                    if rule["frequency"] == "weekly":
-                        weeks_passed = time_diff.days // 7
-                    else: # bi-weekly
-                        weeks_passed = time_diff.days // 14
-                    current_run_number = spec["run_number"] + weeks_passed
-                
-                elif rule["frequency"] == "summer-sundays":
-                    # This is a simple counter just for this kennel for this year
-                    current_run_number = run_number
-                    run_number += 1 # Advance for the next event found
-                
-                else:
-                    current_run_number = run_number # Fallback
+        # --- Full Moon Hash Logic ---
+        if rule["frequency"] == "full-moon":
+            full_moon_dates = calculate_full_moons_for_year(year)
 
+            for fm_month, fm_day in full_moon_dates:
+                if fm_month == month:
+                    # Setting a default time of 7 PM for the event object
+                    next_event = datetime(year, fm_month, fm_day, 19, 0, 0)
+
+                    if start_of_month.date() <= next_event.date() <= end_of_month.date():
+                        event = {
+                            "day": next_event.day,
+                            "kennel": kennel,
+                            "title": "Full Moon Hash",
+                            "run": run_number,
+                            "hares": "TBD",
+                            "time": "7:00 PM (time may vary)",
+                            "start": f"Location TBD for {kennel}",
+                            "map": "",
+                            "hashcash": rule["hashcash"],
+                            "turds": "Yes",
+                            "tweet": "",
+                            "twilight": "",
+                            "date": next_event,
+                            "desc": f"Full Moon Hash Run #{run_number}",
+                            "update": next_event.strftime("%m/%d/%Y %H:%M")
+                        }
+                        events.append(event)
+                        run_number += 1
+            kennel_run_numbers[kennel] = run_number
+            continue
+
+        # --- Regular Event Logic (Weekly/Bi-Weekly/Summer-Sundays) ---
+        current_date = start_of_month
+        while current_date <= end_of_month:
+
+            # Add explicit day-of-week and seasonal checks for robustness
+            kennel_day_name = rule["day"]
+            kennel_day_of_week = DAY_MAP.get(kennel_day_name)
+
+            # 1. Skip if the kennel is seasonal and it's out of season
+            if rule["frequency"] == "summer-sundays" and current_date.month not in [6, 7, 8]:
+                current_date += timedelta(days=1)
+                continue
+
+            # 2. Skip if the current date is NOT the day of the week specified in the rule
+            if kennel_day_of_week is not None and current_date.weekday() != kennel_day_of_week:
+                current_date += timedelta(days=1)
+                continue
+            # End checks
+
+            # If we reach here, the date is the correct day of the week AND in season (if applicable).
+            next_event = calculate_next_event(kennel, start_date, current_date, rule["frequency"])
+
+            # Check if the calculated next event falls exactly on the current date
+            if next_event and next_event.date() == current_date.date() and not any(e['date'].date() == next_event.date() and e['kennel'] == kennel for e in events):
                 event = {
                     "day": next_event.day,
                     "kennel": kennel,
                     "title": "",
-                    "run": current_run_number, # Use the calculated run number
+                    "run": run_number,
                     "hares": "TBD",
                     "time": rule["time"],
                     "start": f"Location TBD for {kennel}",
@@ -129,19 +194,20 @@ def generate_tsv_events(month, year, kennel_run_numbers, specs):
                     "turds": "Yes" if kennel != "YAKH3" else "No",
                     "tweet": "",
                     "twilight": "",
-                    "date": next_event,
-                    "desc": f"Event for {kennel} Run #{current_run_number}",
+                    "date": next_event.replace(hour=0, minute=0, second=0, microsecond=0), # Keep only the date part
+                    "desc": f"Event for {kennel}",
                     "update": next_event.strftime("%m/%d/%Y %H:%M")
                 }
                 events.append(event)
-                
-    
-    # Update run numbers for the next month based on events found
-    for event in events:
-        if event['run'] > 0: # Only update if a valid run number was calculated
-            # Set the next run number to be one greater than the last one found this month
-            kennel_run_numbers[event['kennel']] = max(kennel_run_numbers[event['kennel']], event['run'] + 1)
-    
+                run_number += 1  # Increment the run number after each event
+
+            # Increment the current date after processing for this kennel
+            current_date += timedelta(days=1)
+
+        # Update the global run number for this kennel
+        kennel_run_numbers[kennel] = run_number
+
+    # Sort events by date
     events.sort(key=lambda x: x['date'])
     return events
 
@@ -149,86 +215,105 @@ def generate_tsv_events(month, year, kennel_run_numbers, specs):
 def generate_tsv_file(month, year, events):
     header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE"
     rows = [header]
+
+    # Capture the current UTC time for the "UPDATE" column
     current_utc_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")
 
     for event in events:
-        icon = kennel_icons.get(event['kennel'], "")
-        update_info = f"(calgen 1.0) {current_utc_time}"
-        row = f"{event['day']}\t{event['kennel']}\t{icon}\t{event['title']}\t{event['run']}\t{event['hares']}\t{event['time']}\t{event['start']}\t{event['map']}\t{event['hashcash']}\t{event['turds']}\t{event['tweet']}\t{event['twilight']}\t{event['date'].strftime('%A, %B %d, %Y')}\t{event['desc']}\t{update_info}"
-        rows.append(row)
-    
+        # Retrieve the correct icon for the kennel
+        icon_source = kennel_icons.get(event['kennel'], "")
+        
+        # If the icon source is the function (for Full Moon Hash), call it with the month
+        if callable(icon_source):
+            icon = icon_source(event['date'].month)
+        else:
+            icon = icon_source
+
+        # Use the correct date format for TSV
+        date_str = event['date'].strftime('%A, %B %d, %Y')
+        # BUMPED REVISION TO 1.6
+        update_info = f"(calgen 1.6) {current_utc_time}"
+
+        row = [
+            str(event['day']),
+            event['kennel'],
+            icon,
+            event['title'],
+            str(event['run']),
+            event['hares'],
+            event['time'],
+            event['start'],
+            event['map'],
+            event['hashcash'],
+            event['turds'],
+            event['tweet'],
+            event['twilight'],
+            date_str,
+            event['desc'],
+            update_info
+        ]
+        rows.append("\t".join(row))
+
     return "\n".join(rows)
 
-# Helper function to get the day of the week for a specific date
-def get_day_of_week(year, month, day):
-    # Returns 0 for Monday, 6 for Sunday
-    return date(year, month, day).weekday()
 
-# Function to generate event rows for the PHP file
+# Function to generate the HTML for event rows in the MONTHLY PHP file
 def generate_event_rows(month, year):
-    # Weekday: 0=Mon, 1=Tue, ..., 6=Sun
-    first_day_of_week = get_day_of_week(year, month, 1)
-    
-    # Convert to Sunday-based offset (0=Sun, 1=Mon, ...)
-    start_offset = (first_day_of_week + 1) % 7 
-    
-    days_in_month = calendar.monthrange(year, month)[1]
-    rows = []
-    current_row = '\t\t\t\t\t<tr>\n' # Match known good indentation
-    
-    # 1. Add empty cells before the first day of the month
-    for _ in range(start_offset):
-        current_row += '\t\t\t\t\t\t<td class="empty"></td>\n'
+    # Returns 0 for Monday, 6 for Sunday
+    first_day_of_week = date(year, month, 1).weekday()
+    num_days = calendar.monthrange(year, month)[1]
 
-    day_counter = 1
-    cell_counter = start_offset
+    # Adjust for PHP/HTML calendar start (Sunday = first column)
+    # Python weekday (0=Mon, 6=Sun) -> HTML column index (0=Sun, 6=Sat)
+    start_offset = (first_day_of_week + 1) % 7
 
-    # 2. Fill in the rest of the days
-    while day_counter <= days_in_month:
-        # Check if a new row needs to start
-        if cell_counter % 7 == 0: 
-            # End the previous row and start a new one
-            current_row += '\t\t\t\t\t</tr>\n\n\t\t\t\t\t<tr>\n' 
-        
-        # JavaScript ID uses 0-indexed month (e.g., 1 for Feb) and unpadded day
-        js_month_id = month - 1 
+    html = ""
+    current_day = 1
+    day_of_week = 0 # 0 for Sunday column, 6 for Saturday column
 
-        current_row += f'''\t\t\t\t\t\t<td class="day">
-							<table class="inner" id="j{js_month_id}{day_counter}">
-								<tr>
-									<td class="dom">{day_counter}</td>
-								</tr>
-								<tr>
-									<td class="event">
-										<?php fillIn({month}, {day_counter}, {year}); ?>
-									</td>
-								</tr>
-							</table>
-						</td>\n''' # Match known good indentation
+    # First row: starting blanks
+    html += "\t\t\t\t\t<tr >\n"
+    for i in range(start_offset):
+        html += "\t\t\t\t\t\t<td class=\"empty\"></td>\n"
+        day_of_week += 1
 
-        day_counter += 1
-        cell_counter += 1
+    # Loop through all days of the month
+    while current_day <= num_days:
+        if day_of_week == 7:
+            html += "\t\t\t\t\t</tr>\n"
+            html += "\t\t\t\t\t<tr >\n"
+            day_of_week = 0
 
-    # 3. GENERATE BLANKS UNTIL THE LAST ROW IS COMPLETE
-    if cell_counter % 7 != 0:
-        while cell_counter % 7 != 0:
-            current_row += '\t\t\t\t\t\t<td class="empty"></td>\n'
-            cell_counter += 1
-    
-    current_row += '\t\t\t\t\t</tr>\n'
-    rows.append(current_row)
+        # Build the PHP call string
+        php_call = f"<?php fillIn({month}, {current_day}, {year}); ?>"
 
-    return "".join(rows)
+        # Use month-1 for the JavaScript ID as d.getMonth() returns 0-11
+        js_id_month = month - 1
 
+        # Generate the table cell HTML for the day
+        cell_html = f"""\t\t\t\t\t\t<td class=\"day\">\n\t\t\t\t\t\t\t<table class=\"inner\" id=\"j{js_id_month}{current_day}\">\n\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t<td class=\"dom\">{current_day}</td>\n\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t\t<tr>\n\t\t\t\t\t\t\t\t\t<td class=\"event\">\n\t\t\t\t\t\t\t\t\t\t{php_call}\n\t\t\t\t\t\t\t\t\t</td>\n\t\t\t\t\t\t\t\t</tr>\n\t\t\t\t\t\t\t</table>\n\t\t\t\t\t\t</td>\n"""
+
+        html += cell_html
+
+        current_day += 1
+        day_of_week += 1
+
+    # Last row: ending blanks
+    while day_of_week < 7:
+        html += "\t\t\t\t\t\t<td class=\"empty\"></td>\n"
+        day_of_week += 1
+
+    html += "\t\t\t\t\t</tr>\n"
+
+    return html
 
 # Function to generate a PHP calendar file template for a specific month and year
 def generate_php_file(month, year, previous_month_link, next_month_link):
     month_name = calendar.month_name[month]
     month_image = f"month-{str(month).zfill(2)}.png"
     year_suffix = str(year)[-2:]
-    
-    # --- FIX 1: Corrected JavaScript/CSS (includes throb.gif rule) ---
-    # This ensures today's date is highlighted correctly (using the known good code)
+
+    # JS/CSS logic, including the today highlight and nav window
     js_logic = f"""
 <script language="JavaScript">
 // script to highlight todays date via style override
@@ -243,19 +328,18 @@ var id = "j" + d.getMonth() + d.getDate();
 		</script>
 """
 
-    # --- FIX 2: Corrected Navigation Footer ---
     nav_footer = """
 		<tr id="nav">
 			<td>
 			<div id="menu">
 				<a href="/index.html">home</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				calendar&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Events/index.html">events</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Maps/index.html">maps</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				<a href="/Our_Idiots/index.html">our idiots</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				<a href="/Write-Ups/index.html">write-ups</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Gallery/index.html">gallery</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Links/index.html">links</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				<a href="/Road_Trip/index.html">road trip</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="planning.php">planning</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="planning.php">year</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				<a href="/mobile/index.php">mobile</a>&nbsp;&nbsp;&nbsp;&nbsp;
 				<a href="#" onclick="openNav();">nav</a>&nbsp;&nbsp;&nbsp;&nbsp;
 		</div> </td>
@@ -276,7 +360,7 @@ var id = "j" + d.getMonth() + d.getDate();
 <?php
 	$year={year};
 	$month={month};
-	include 'php.php'; // <<< REVERTED to original 'php.php'
+	include 'php.php';
 ?>
 </head>
 <body>
@@ -320,27 +404,167 @@ var id = "j" + d.getMonth() + d.getDate();
     return php_content
 
 
+# =========================================================================
+# REWRITTEN FUNCTION: generate_planning_php (REVISION 1.6)
+# Fixes the layout to match the known_good_2019_planning.php (single year-long table)
+# =========================================================================
+
+# Helper function for a single day cell in the yearly planning view
+def generate_yearly_day_cell(month_name, day_of_month, month_num, year):
+    # Heuristic for color coding (alternating month colors: Odd=blue, Even=red)
+    day_class = "blue" if month_num % 2 != 0 else "red"
+    php_call = f"<?php fillIn({month_num}, {day_of_month}, {year}); ?>"
+    
+    # Structure matches the layout of the old generator for a single day cell
+    return f"""\t\t\t\t\t\t<td class="{day_class}">
+\t\t\t\t\t\t\t<table class="inner">
+\t\t\t\t\t\t\t\t<tr>
+\t\t\t\t\t\t\t\t\t<td class="dom">{month_name}  {day_of_month}</td>
+\t\t\t\t\t\t\t\t</tr>
+\t\t\t\t\t\t\t\t<tr>
+\t\t\t\t\t\t\t\t<td class="event"> {php_call}</td>
+\t\t\t\t\t\t\t\t</tr>
+\t\t\t\t\t\t\t\t<tr>
+\t\t\t\t\t\t\t\t\t<td class="info"></td>
+\t\t\t\t\t\t\t\t</tr>
+\t\t\t\t\t\t\t</table>
+\t\t\t\t\t\t</td>
+"""
+
+# NEW FUNCTION: Generate the full-year planning.php file
+def generate_planning_php(year):
+    
+    # 1. Start the main HTML template (copied from known_good_2019_planning.php)
+    html_content = f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtmltransitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+\t<meta http-equiv="pragma" content="no-cache" />
+\t<meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
+\t<meta http-equiv="content-type" content="text/html;charset=utf-8" />
+\t
+\t<title>{year} Planning Calendar</title>
+\t<link href="calendar.css" rel="stylesheet" type="text/css" media="all" />
+\t
+\t
+\t<?php
+\t$year={year};
+\tinclude 'big.php';
+\t?>
+\t
+</head>
+\t
+<body>
+\t
+<div class=container>
+\t<table class="overall"  border="0" cellspacing="0" cellpadding="0">
+\t\t<tr>
+\t\t\t<td>
+\t\t\t\t<table class="banner" border="0" cellspacing="0" cellpadding="0">
+\t\t\t\t\t<tr>
+\t\t\t\t\t\t<td><img src="planning.png" alt=""  border="0" usemap="#Map"/></td>
+\t\t\t\t\t</tr>
+\t\t\t\t</table>
+\t\t\t</td>
+\t\t</tr>
+\t\t<tr>
+\t\t\t<td>
+\t\t\t\t<table class="main"  border="0" cellspacing="0" cellpadding="0">
+\t\t\t\t\t<tr >
+\t\t\t\t\t\t<th>Sunday</th>
+\t\t\t\t\t\t<th>Monday</th>
+\t\t\t\t\t\t<th>Tuesday</th>
+\t\t\t\t\t\t<th>Wednesday</th>
+\t\t\t\t\t\t<th>Thursday</th>
+\t\t\t\t\t\t<th>Friday</th>
+\t\t\t\t\t\t<th>Saturday</th>
+\t\t\t\t\t</tr>
+"""
+    
+    # 2. Sequential Day Generation Logic
+    
+    start_date = datetime(year, 1, 1)
+    # Python weekday: (date.weekday() + 1) % 7 gives 0=Sunday for use in HTML table (0=Sun, 6=Sat)
+    day_of_week_index = (start_date.weekday() + 1) % 7 
+    
+    num_days_in_year = 366 if calendar.isleap(year) else 365
+    current_date = start_date
+    html_rows = ""
+
+    # Start the first row
+    html_rows += "\t\t\t\t\t<tr>\n"
+    
+    # Add initial empty cells until the first day of the year (Jan 1)
+    for _ in range(day_of_week_index):
+        html_rows += "\t\t\t\t\t\t<td class=\"empty\"></td>\n"
+
+    # Iterate through all days in the year
+    for day_of_year in range(num_days_in_year):
+        
+        # Check if the current date is Sunday (Python's weekday: 6) and it's not the very first day
+        if current_date.weekday() == 6 and day_of_year > 0: 
+            html_rows += "\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n"
+            
+        # Generate the cell
+        html_rows += generate_yearly_day_cell(
+            MONTH_NAMES[current_date.month],
+            current_date.day,
+            current_date.month,
+            year
+        )
+        
+        # Advance to the next day
+        current_date += timedelta(days=1)
+        
+    # Close the last row
+    
+    # Get the day index for the day *after* the last day in the year (0=Sun, 6=Sat)
+    last_day_of_week_index = (current_date.weekday() + 1) % 7
+    
+    if last_day_of_week_index != 0:
+        # Number of empty cells needed to complete the row
+        empty_cells_needed = 7 - last_day_of_week_index
+        for _ in range(empty_cells_needed):
+            html_rows += "\t\t\t\t\t\t<td class=\"empty\"></td>\n"
+
+    html_rows += "\t\t\t\t\t</tr>\n" # Close the last row
+    
+    html_content += html_rows
+
+    # 3. End the HTML template
+    html_content += f"""\t\t\t\t</table>
+\t\t\t</td>
+\t\t</tr>
+\t</table>
+</div>
+</body>
+</html>
+"""
+
+    file_path = f"calendar/planning.php"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, 'w') as f:
+        f.write(html_content)
+        
+    return file_path
+
+
 # Function to generate both TSV and PHP files for a month
-def generate_files_for_month(month, year, kennel_run_numbers, specs):
+def generate_files_for_month(month, year, kennel_run_numbers):
+    # Generate previous and next month links for PHP
     previous_month = (month - 1) if month > 1 else 12
     previous_year = year if month > 1 else year - 1
     next_month = (month + 1) if month < 12 else 1
     next_year = year if month < 12 else year + 1
 
-    # Corrected Navigation links (flat file names for same year, relative path for cross-year)
-    if previous_year == year:
-        # Correct same-year link (e.g., $01-2025.php)
-        previous_month_link = f"${str(previous_month).zfill(2)}-{year}.php"
-    else:
-        # Correct cross-year link (e.g., ../2024/$12-2024.php)
-        previous_month_link = f"../{previous_year}/${str(previous_month).zfill(2)}-{previous_year}.php"
-        
-    if next_year == year:
-        next_month_link = f"${str(next_month).zfill(2)}-{year}.php"
-    else:
-        next_month_link = f"../{next_year}/${str(next_month).zfill(2)}-{next_year}.php"
+    # --- FIX: ADD $ PREFIX AND USE HYPHEN IN FILENAMES/LINKS (from previous turn) ---
+    
+    # Navigation links with the '$' prefix and HYPHEN
+    previous_month_link = f"../{previous_year}/${str(previous_month).zfill(2)}-{previous_year}.php"
+    next_month_link = f"../{next_year}/${str(next_month).zfill(2)}-{next_year}.php"
 
-    events = generate_tsv_events(month, year, kennel_run_numbers, specs)
+    # kennel_run_numbers is updated by generate_tsv_events to maintain run numbers across months
+    events = generate_tsv_events(month, year, kennel_run_numbers)
 
     # Generate TSV (Android) file
     tsv_content = generate_tsv_file(month, year, events)
@@ -349,70 +573,39 @@ def generate_files_for_month(month, year, kennel_run_numbers, specs):
     with open(tsv_file_path, 'w') as tsv_file:
         tsv_file.write(tsv_content)
 
-    # Generate PHP file (using the requested $MM-YYYY.php file naming)
+    # Generate PHP file with the '$' prefix and HYPHEN
     php_content = generate_php_file(month, year, previous_month_link, next_month_link)
-    php_file_name = f"${str(month).zfill(2)}-{year}.php" 
-    php_file_path = f"calendar/{year}/{php_file_name}"
-    
+    php_file_path = f"calendar/{year}/${str(month).zfill(2)}-{year}.php"
     os.makedirs(os.path.dirname(php_file_path), exist_ok=True)
     with open(php_file_path, 'w') as php_file:
         php_file.write(php_content)
 
     return php_file_path, tsv_file_path
 
-def parse_date_arg(date_string):
-    """Custom type function for argparse to parse YYYY-MM-DD or MM/DD/YYYY"""
-    try:
-        if '-' in date_string:
-            return datetime.strptime(date_string, "%Y-%m-%d")
-        elif '/' in date_string:
-            return datetime.strptime(date_string, "%m/%d/%Y")
-        else:
-            raise ValueError
-    except ValueError:
-        raise argparse.ArgumentTypeError("Date must be in YYYY-MM-DD or MM/DD/YYYY format.")
-
 # Main function to generate files for an entire year
-def generate_files_for_year(year, specs):
+def generate_files_for_year(year):
     # Initialize run numbers for each kennel
-    kennel_run_numbers = {kennel: spec["run_number"] for kennel, spec in specs.items()}
+    kennel_run_numbers = {kennel: spec["run_number"] for kennel, spec in kennel_specs.items()}
 
+    print(f"Generating monthly files for {year}...")
     for month in range(1, 13):
-        php_file_path, tsv_file_path = generate_files_for_month(month, year, kennel_run_numbers, specs)
-        print(f"Generated: {php_file_path} and {tsv_file_path}")
+        php_file_path, tsv_file_path = generate_files_for_month(month, year, kennel_run_numbers)
+
+    # Generate the yearly planning file after all monthly events have been calculated
+    print(f"Generating full-year planning file...")
+    planning_file_path = generate_planning_php(year)
+    print(f"Generated: {planning_file_path}")
+
 
 if __name__ == "__main__":
-    default_year = datetime.now().year + 1
-    
+    # Argument parser to get year input from the command line
     parser = argparse.ArgumentParser(description="Generate calendar and android files for the given year.")
-    parser.add_argument("year", 
-                        type=int, 
-                        nargs='?', 
-                        default=default_year,
-                        help=f"The year for which to generate the files (e.g., 2038). Defaults to {default_year}.")
-    
-    parser.add_argument("--dallas_start", 
-                        type=parse_date_arg, 
-                        help="Override the initial Dallas Hash Saturday run date (e.g., 2025-01-11 or 01/11/2025).")
-    
+    parser.add_argument("year", type=int, help="The year for which to generate the files (e.g., 2038).")
     args = parser.parse_args()
 
-    updated_specs = kennel_specs.copy()
-    
-    if args.dallas_start:
-        dallas_start_date = args.dallas_start.replace(hour=14, minute=0)
-        
-        if dallas_start_date.weekday() != 5: # 5 is Saturday
-            print(f"Error: The provided Dallas start date '{args.dallas_start.strftime('%Y-%m-%d')}' is not a Saturday. Aborting.", file=sys.stderr)
-            sys.exit(1)
-            
-        print(f"Overriding Dallas Hash initial date with: {dallas_start_date.strftime('%Y-%m-%d')}")
-        
-        updated_specs["Dallas Hash"]["initial_date"] = dallas_start_date
-        
-        ft_worth_start_date = dallas_start_date + timedelta(days=7)
-        updated_specs["Ft Worth Hash"]["initial_date"] = ft_worth_start_date.replace(hour=14, minute=0)
-        
-        print(f"Setting Fort Worth Hash initial date to opposite Saturday: {ft_worth_start_date.strftime('%Y-%m-%d')}")
-
-    generate_files_for_year(args.year, updated_specs)
+    # Generate files for the input year
+    if args.year < 2000 or args.year > 2100:
+        print("Error: Please specify a year between 2000 and 2100.")
+    else:
+        generate_files_for_year(args.year)
+        print(f"Successfully generated all files for {args.year}.")
