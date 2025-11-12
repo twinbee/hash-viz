@@ -81,7 +81,7 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                     current_date += timedelta(weeks=1)
                 elif rule["frequency"] == "bi-weekly":
                     current_date += timedelta(weeks=2)
-                elif rule["frequency"] in ["monthly", "summer-sundays"]: # Handle Monthly here
+                elif rule["frequency"] in ["monthly", "summer-sundays"]:
                     current_date += timedelta(weeks=4)
                 continue
 
@@ -242,11 +242,30 @@ def generate_planning_php(year, kennel_run_numbers):
 
 def generate_files_for_month(month, year, kennel_run_numbers):
     """Generates the monthly PHP and TSV files."""
+    
+    # Calculate previous and next month/year
     prev_month, prev_year = (month - 1, year) if month > 1 else (12, year - 1)
     next_month, next_year = (month + 1, year) if month < 12 else (1, year + 1)
-        
-    prev_month_link = f"../{prev_year}/${str(prev_month).zfill(2)}-{prev_year}.php"
-    next_month_link = f"../{next_year}/${str(next_month).zfill(2)}-{next_year}.php"
+    
+    # --- Fix for Navigation Links (Next/Previous Buttons) ---
+    
+    # Filenames, including the unusual '$' prefix
+    prev_filename = f"${str(prev_month).zfill(2)}-{prev_year}.php"
+    next_filename = f"${str(next_month).zfill(2)}-{next_year}.php"
+
+    # Determine relative path: simple filename if in the same year directory, 
+    # or '../{year}/{filename}' if crossing a year boundary.
+    if prev_year == year:
+        prev_month_link = prev_filename
+    else:
+        prev_month_link = f"../{prev_year}/{prev_filename}"
+
+    if next_year == year:
+        next_month_link = next_filename
+    else:
+        next_month_link = f"../{next_year}/{next_filename}"
+    
+    # --- End Fix ---
 
     # --- Generate TSV File ---
     tsv_content = generate_tsv_events(month, year, kennel_run_numbers)
@@ -270,6 +289,7 @@ def generate_files_for_month(month, year, kennel_run_numbers):
     php_rows = generate_event_rows(month, year)
     php_content = php_head + php_rows + HTML_FOOTER_MONTH
     
+    # Note: The output filename contains the dollar sign to match the legacy file structure
     php_file_path = f"calendar/{year}/${str(month).zfill(2)}-{year}.php"
     os.makedirs(os.path.dirname(php_file_path), exist_ok=True)
     with open(php_file_path, 'w') as php_file:

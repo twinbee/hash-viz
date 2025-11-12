@@ -51,10 +51,10 @@ def get_full_moon_icon(month):
     """Returns the icon filename based on the month number (1-12)."""
     return f"Calendar Icons-{str(month).zfill(2)}.png"
 
-# Storing the icon information for each kennel
+# Storing the icon information for each kennel (UPDATED)
 KENNEL_ICONS = {
-    "Dallas Urban Hash": "DUMB.png",
-    "NO-NO-DUH": "NoDHHH2.png", 
+    "Dallas Urban Hash": "DUH.png",
+    "NO-NO-DUH": "nonoduh.png", 
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
     "Full Moon Hash": get_full_moon_icon
@@ -119,7 +119,7 @@ HTML_HEAD_MONTH = """
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
 <meta http-equiv="content-type" content="text/html;charset=utf-8" />
-<meta name="generator" content="Martha's Calendar Generator" />
+<meta name="generator" content="Calgen 1.7" />
 <link rel="apple-touch-icon" href="/dfwh3-152x152.png" />
 <title>{month_name}, {year} Hash Events</title>
 <link href="calendar.css" rel="stylesheet" type="text/css" media="all" />
