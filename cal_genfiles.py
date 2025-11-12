@@ -37,8 +37,8 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                     if start_of_month.date() <= next_event.date() <= end_of_month.date():
                         sunset_time_str = calculate_sunset_time_dallas(next_event) 
                         event = {
-                            "day": next_event.day, "kennel": kennel, "title": "Full Moon Hash",
-                            "run": run_number, "hares": "", "time": "7:00 PM (time may vary)",
+                            "day": next_event.day, "kennel": kennel, "title": "",
+                            "run": run_number, "hares": "", "time": rule["time"],
                             "start": "", "map": "", "hashcash": rule["hashcash"],
                             "turds": "", "tweet": "", "twilight": sunset_time_str, 
                             "date": next_event, "desc": "", 
@@ -96,10 +96,10 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                 sunset_time_str = calculate_sunset_time_dallas(datetime(year, month, current_date.day))
 
                 event = {
-                    "day": current_date.day, "kennel": kennel, "title": f"{kennel} Run",
+                    "day": current_date.day, "kennel": kennel, "title": "",
                     "run": run_number, "hares": "", "time": time_str,
                     "start": "", "map": "", "hashcash": rule["hashcash"],
-                    "turds": "Yes", "tweet": "", "twilight": sunset_time_str, 
+                    "turds": "", "tweet": "", "twilight": sunset_time_str, 
                     "date": datetime(year, month, current_date.day), "desc": "", 
                     "update": current_date.strftime("%m/%d/%Y %H:%M")
                 }
@@ -154,6 +154,9 @@ def generate_event_rows(month, year):
     first_day_of_week = datetime(year, month, 1).weekday()
     num_days = calendar.monthrange(year, month)[1]
     php_first_day_of_week = (first_day_of_week + 1) % 7 # 0=Sun, 6=Sat
+    
+    # Get special dates for this year
+    special_dates = get_special_dates_for_year(year)
 
     html_rows = "\t\t\t\t\t<tr>\n"
 
@@ -166,10 +169,24 @@ def generate_event_rows(month, year):
             html_rows += '\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n'
 
         js_id = f"j{month-1}{day_count}"
+        
+        # Check if this date is a special date
+        date_key = (month, day_count)
+        special_info = special_dates.get(date_key)
+        
+        # The outer td always has class="day"
         html_rows += f'\t\t\t\t\t\t<td class="day">\n'
         html_rows += f'\t\t\t\t\t\t\t<table class="inner" id="{js_id}">\n'
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
-        html_rows += f'\t\t\t\t\t\t\t\t\t<td class="dom">{day_count}</td>\n'
+        
+        # Only the dom td gets the holiday/blue_bar class and tag
+        if special_info:
+            info_text = special_info[0]
+            dom_class = special_info[1]  # "holiday" or "blue_bar"
+            html_rows += f'\t\t\t\t\t\t\t\t\t<td class="{dom_class}"><span class="tag">{info_text}</span>{day_count}</td>\n'
+        else:
+            html_rows += f'\t\t\t\t\t\t\t\t\t<td class="dom">{day_count}</td>\n'
+        
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
         html_rows += '\t\t\t\t\t\t\t\t\t<td class="event">\n'
@@ -214,27 +231,22 @@ def generate_year_grid_for_planning(year):
         date_key = (current_date.month, current_date.day)
         special_info = special_dates.get(date_key)
         
-        if special_info:
-            info_text = special_info[0] 
-            day_class = special_info[1] 
-            dom_class = day_class 
-        else:
-            day_class = "day" 
-            info_text = ""
-            dom_class = "dom" 
-        
         dom_text = str(current_date.day)
         if current_date.day == 1:
             dom_text = f"{MONTH_NAMES[current_date.month]} {current_date.day}"
 
-        html_rows += f'\t\t\t\t\t\t<td class="{day_class}">\n'
+        # The outer td always has class="day"
+        html_rows += '\t\t\t\t\t\t<td class="day">\n'
         html_rows += '\t\t\t\t\t\t\t<table class="inner">\n' 
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
         
+        # Only the dom td gets the holiday/blue_bar class and tag
         if special_info:
+            info_text = special_info[0]
+            dom_class = special_info[1]  # "holiday" or "blue_bar"
             html_rows += f'\t\t\t\t\t\t\t\t\t<td class="{dom_class}"><span class="tag">{info_text}</span>{dom_text}</td>\n'
         else:
-            html_rows += f'\t\t\t\t\t\t\t\t\t<td class="{dom_class}">{dom_text}</td>\n'
+            html_rows += f'\t\t\t\t\t\t\t\t\t<td class="dom">{dom_text}</td>\n'
 
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
