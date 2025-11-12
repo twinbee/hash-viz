@@ -40,7 +40,7 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                             "day": next_event.day, "kennel": kennel, "title": "Full Moon Hash",
                             "run": run_number, "hares": "", "time": "7:00 PM (time may vary)",
                             "start": "", "map": "", "hashcash": rule["hashcash"],
-                            "turds": "Yes", "tweet": "", "twilight": sunset_time_str, 
+                            "turds": "", "tweet": "", "twilight": sunset_time_str, 
                             "date": next_event, "desc": "", 
                             "update": next_event.strftime("%m/%d/%Y %H:%M")
                         }
@@ -66,10 +66,10 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                 sunset_time_str = calculate_sunset_time_dallas(next_event) 
                 
                 event = {
-                    "day": next_event.day, "kennel": kennel, "title": f"{kennel} Run",
+                    "day": next_event.day, "kennel": kennel, "title": "",
                     "run": run_number, "hares": "", "time": rule["time"],
                     "start": "", "map": "", "hashcash": rule["hashcash"],
-                    "turds": "Yes", "tweet": "", "twilight": sunset_time_str, 
+                    "turds": "", "tweet": "", "twilight": sunset_time_str, 
                     "date": next_event, "desc": "", 
                     "update": next_event.strftime("%m/%d/%Y %H:%M")
                 }
