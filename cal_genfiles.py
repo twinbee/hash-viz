@@ -145,7 +145,7 @@ def generate_tsv_events(month, year, kennel_run_numbers):
         ]
         rows.append("\t".join(row))
 
-    return "\n".join(rows)
+    return "\n".join(rows), temp_run_numbers
 
 # --- PHP/HTML Grid Generation Functions ---
 
@@ -298,7 +298,11 @@ def generate_files_for_month(month, year, kennel_run_numbers):
     # --- End Fix ---
 
     # --- Generate TSV File ---
-    tsv_content = generate_tsv_events(month, year, kennel_run_numbers)
+    tsv_content, updated_run_numbers = generate_tsv_events(month, year, kennel_run_numbers)
+    
+    # Update the passed-in dictionary with the new run numbers
+    kennel_run_numbers.update(updated_run_numbers)
+    
     tsv_file_path = f"android/{year}-{str(month).zfill(2)}.txt"
     os.makedirs(os.path.dirname(tsv_file_path), exist_ok=True)
     with open(tsv_file_path, 'w') as tsv_file:

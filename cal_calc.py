@@ -95,58 +95,90 @@ def get_special_dates_for_year(year):
 def is_dst_dallas(date_obj):
     """Checks if a given datetime object is within the US DST period."""
     year = date_obj.year
-    # DST Start: Second Sunday in March
+    # DST Start: Second Sunday in March at 2:00 AM
     march_first = date(year, 3, 1)
     first_sunday_march = march_first + timedelta(days=(6 - march_first.weekday()) % 7) 
     dst_start_date = first_sunday_march + timedelta(weeks=1)
-    # DST End: First Sunday in November
+    # DST End: First Sunday in November at 2:00 AM
     november_first = date(year, 11, 1)
     dst_end_date = november_first + timedelta(days=(6 - november_first.weekday()) % 7) 
     event_date = date_obj.date()
     return (event_date >= dst_start_date) and (event_date < dst_end_date)
 
 def calculate_sunset_time_dallas(date_obj):
-    """Calculates the sunset time for Dallas, TX for a given date."""
-    N = date_obj.timetuple().tm_yday - 1
-    M = (0.9856 * N) + 357.5291
-    M = M % 360
-    C = (1.9148 * math.sin(math.radians(M))) + (0.0200 * math.sin(math.radians(2 * M))) + (0.0003 * math.sin(math.radians(3 * M)))
-    L_sun = M + 282.9404 + C
-    L_sun = L_sun % 360
-    Dec = math.degrees(math.asin(math.sin(math.radians(23.44)) * math.sin(math.radians(L_sun))))
-
-    try:
-        cos_H = (math.sin(math.radians(-0.833)) - math.sin(math.radians(DALLAS_LATITUDE)) * math.sin(math.radians(Dec))) / \
-                (math.cos(math.radians(DALLAS_LATITUDE)) * math.cos(math.radians(Dec)))
-    except ValueError: return "" 
-
-    if cos_H > 1 or cos_H < -1: return "" 
-
-    H = math.degrees(math.acos(cos_H)) / 15.0 
-
-    RA = math.degrees(math.atan2(math.cos(math.radians(23.44)) * math.sin(math.radians(L_sun)), math.cos(math.radians(L_sun)))) / 15.0
-    RA = RA % 24
+    """Calculates the sunset time for Dallas, TX for a given date using a simplified algorithm."""
+    # Day of year (1-365/366)
+    N = date_obj.timetuple().tm_yday
     
-    UT_set = 12 + H - RA - (DALLAS_LONGITUDE / 15.0)
-    UT_set = UT_set % 24
+    # Mean anomaly in degrees
+    M = (0.9856 * N) - 3.289
     
-    time_offset = 6 
-    local_hour = UT_set - time_offset
+    # Sun's true longitude
+    L = M + (1.916 * math.sin(math.radians(M))) + (0.020 * math.sin(math.radians(2 * M))) + 282.634
+    L = L % 360
     
+    # Sun's right ascension
+    RA = math.degrees(math.atan(0.91764 * math.tan(math.radians(L))))
+    RA = RA % 360
+    
+    # Right ascension needs to be in the same quadrant as L
+    L_quadrant = (math.floor(L / 90)) * 90
+    RA_quadrant = (math.floor(RA / 90)) * 90
+    RA = RA + (L_quadrant - RA_quadrant)
+    
+    # Convert RA to hours
+    RA = RA / 15
+    
+    # Sun's declination
+    sin_dec = 0.39782 * math.sin(math.radians(L))
+    cos_dec = math.cos(math.asin(sin_dec))
+    
+    # Sun's local hour angle for sunset (accounting for atmospheric refraction)
+    cos_H = (math.sin(math.radians(-0.833)) - (sin_dec * math.sin(math.radians(DALLAS_LATITUDE)))) / \
+            (cos_dec * math.cos(math.radians(DALLAS_LATITUDE)))
+    
+    # Check if sun rises/sets on this day
+    if cos_H > 1 or cos_H < -1:
+        return ""
+    
+    # Hour angle for sunset (in hours)
+    H = math.degrees(math.acos(cos_H)) / 15
+    
+    # Local mean time of sunset
+    T = H + RA - (0.06571 * N) - 6.622
+    
+    # Adjust for longitude (Dallas is at -96.7970)
+    UT = T - (DALLAS_LONGITUDE / 15)
+    UT = UT % 24
+    
+    # Convert to local time zone
+    # CST is UTC-6, CDT is UTC-5
     if is_dst_dallas(date_obj):
-        local_hour += 1 
-
-    hour = int(local_hour) % 24
-    minute = int(round((local_hour - int(local_hour)) * 60))
+        local_time = UT - 5  # CDT
+    else:
+        local_time = UT - 6  # CST
     
-    if minute >= 60: minute -= 60; hour += 1
-    elif minute < 0: minute += 60; hour -= 1
-        
+    # Normalize to 0-24 range
+    local_time = local_time % 24
+    
+    # Convert to hours and minutes
+    hour = int(local_time)
+    minute = int(round((local_time - hour) * 60))
+    
+    # Handle minute overflow
+    if minute >= 60:
+        minute = 0
+        hour += 1
+    if minute < 0:
+        minute += 60
+        hour -= 1
+    
     hour = hour % 24
     
     try:
         final_time = datetime(date_obj.year, date_obj.month, date_obj.day, hour, minute)
-    except ValueError: return "" 
+    except ValueError:
+        return ""
     
     return final_time.strftime("%#I:%M %p").replace(' 0', ' ')
 
