@@ -1,3 +1,4 @@
+
 import os
 import calendar
 from datetime import datetime, timedelta
@@ -5,24 +6,32 @@ import argparse
 from datetime import datetime, timezone
 from datetime import date # Added for get_day_of_week helper
 
+# Dictionary to map month number to the specific moon name used in banner filenames
+MOON_NAMES = {
+    1: "Wolf", 2: "Snow", 3: "Worm", 4: "Pink", 5: "Flower", 6: "Strawberry",
+    7: "Buck", 8: "Sturgeon", 9: "Harvest", 10: "Hunter", 11: "Beaver", 12: "Cold"
+}
+
 # Specification block for initial date and run numbers for each kennel
+# 1) FIX: Replaced "NODUH Hash" with "NO-NO-DUH" using the user's provided start date/run number
 kennel_specs = {
-    "Dallas Hash": {"initial_date": datetime(2024, 1, 6), "run_number": 1213},
-    "Ft Worth Hash": {"initial_date": datetime(2024, 1, 13), "run_number": 1049},
-    "Dallas Urban Hash": {"initial_date": datetime(2024, 1, 3), "run_number": 834},
-    #"NODUH Hash": {"initial_date": datetime(2024, 1, 8), "run_number": 319},
-    "NO-NO-DUH": {"initial_date": datetime(2024, 1, 15), "run_number": 5},
+    "Dallas Hash": {"initial_date": datetime(2024, 1, 6), "run_number": 1151},
+    "Ft Worth Hash": {"initial_date": datetime(2024, 1, 13), "run_number": 999},
+    "Dallas Urban Hash": {"initial_date": datetime(2024, 1, 3), "run_number": 731},
+    "NO-NO-DUH": {"initial_date": datetime(2024, 1, 15), "run_number": 5}, # NEW HASH
+    # "NODUH Hash": {"initial_date": datetime(2024, 1, 8), "run_number": 319}, # OLD HASH REMOVED
     "YAKH3": {"initial_date": datetime(2024, 6, 2), "run_number": 1},  # First Sunday in summer
-    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25), "run_number": 87}  # Reference date for calculation
+    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25), "run_number": 63}  # Reference date for calculation
 }
 
 # Hashcash and schedule rules for each kennel
+# 1) FIX: Added "NO-NO-DUH" rules
 kennel_rules = {
     "Dallas Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$10.00 - Pay Online: Paypal $10", "day": "Saturday"},
     "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
     "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
-    # "NODUH Hash": {"frequency": "bi-weekly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"},
-    "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"},
+    "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, # NEW HASH RULES
+    # "NODUH Hash": {"frequency": "bi-weekly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, # OLD HASH REMOVED
     "YAKH3": {"frequency": "summer-sundays", "time": "12:00 PM", "hashcash": "", "day": "Sunday"},  # Summer months only
     "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"}
 }
@@ -40,16 +49,14 @@ MONTH_NAMES = ["", "January", "February", "March", "April", "May", "June", "July
 def get_full_moon_icon(month):
     """Returns the icon filename based on the month number (1-12)."""
     # The file names for full moon icons are in the format "Calendar Icons-MM.png"
-    # or "MM-Moon_name@4x.png" for some of the uploaded files.
-    # We will use the consistent format "Calendar Icons-MM.png" for the generator
-    # and let the user rename or alias if needed.
     return f"Calendar Icons-{str(month).zfill(2)}.png"
 
 # Storing the icon information for each kennel
+# 1) FIX: Added "NO-NO-DUH" icon and removed the old "NODUH Hash"
 kennel_icons = {
-    "Dallas Urban Hash": "DUH.png",
-    "NODUH Hash": "NoDHHH2.png",
-    "NO-NO-DUH":"nonoduh.png",
+    "Dallas Urban Hash": "DUMB.png",
+    "NO-NO-DUH": "nonoduh.png", # Using the old NODUH icon file name
+    # "NODUH Hash": "NoDHHH2.png", # OLD HASH REMOVED
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
     # Use the function for the Full Moon Hash icon
@@ -116,11 +123,32 @@ def calculate_next_event(kennel, start_date, current_date, frequency):
         return None
 
     next_event = start_date
-    while next_event < current_date:
+    while next_event.date() < current_date.date():
         next_event += delta
-    return next_event
+        
+    # Check for the correct day of the week as well (important for non-weekly)
+    kennel_day_name = kennel_rules[kennel]["day"]
+    kennel_day_of_week = DAY_MAP.get(kennel_day_name)
+    
+    # If the current next_event date's day of week does not match the kennel's required day,
+    # and the frequency is bi-weekly/seasonal, we might need a tighter check.
+    # However, for bi-weekly/weekly, the initial date *should* be the correct day, 
+    # and adding weeks preserves the day of week. We rely on the caller's logic 
+    # (checking `current_day_of_week == kennel_day_of_week`) to be correct.
+    # We only need to ensure `next_event` is *the* event date that matches the cycle.
+    
+    # If the calculated date is in the future, step back one cycle if needed to find the closest one
+    if next_event.date() > current_date.date():
+        next_event -= delta
+
+    # If even after stepping back, the date is still before the current date, step forward once to get the match.
+    if next_event.date() < current_date.date():
+        next_event += delta
+        
+    return next_event if next_event.date() == current_date.date() else None
 
 # Function to generate TSV event data for each month based on the rules
+# (No changes needed here, as the logic for NO-NO-DUH is covered by the dict updates)
 def generate_tsv_events(month, year, kennel_run_numbers):
     events = []
     start_of_month = datetime(year, month, 1)
@@ -153,16 +181,16 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                             "kennel": kennel,
                             "title": "Full Moon Hash",
                             "run": run_number,
-                            "hares": "TBD",
+                            "hares": "",
                             "time": "7:00 PM (time may vary)",
-                            "start": f"Location TBD for {kennel}",
+                            "start": "",
                             "map": "",
                             "hashcash": rule["hashcash"],
                             "turds": "Yes",
                             "tweet": "",
                             "twilight": is_twilight,
                             "date": next_event,
-                            "desc": f"Full Moon Hash Run #{run_number}",
+                            "desc": "",
                             "update": next_event.strftime("%m/%d/%Y %H:%M")
                         }
                         events.append(event)
@@ -192,9 +220,9 @@ def generate_tsv_events(month, year, kennel_run_numbers):
 
             # 3. Determine if the event day aligns with the frequency and initial date
             # Calculate the expected next event date for this day of the week
-            expected_event_date = calculate_next_event(kennel, start_date, current_date, rule["frequency"])
+            expected_event_date_dt = calculate_next_event(kennel, start_date, current_date, rule["frequency"])
 
-            if expected_event_date and expected_event_date.date() == current_date.date():
+            if expected_event_date_dt and expected_event_date_dt.date() == current_date.date():
                 # This date is a match for the kennel's schedule
                 
                 # Determine run time for the event object (defaulting to start of day for now)
@@ -206,18 +234,18 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                 event = {
                     "day": current_date.day,
                     "kennel": kennel,
-                    "title": f"{kennel} Run",
+                    "title": "",
                     "run": run_number,
-                    "hares": "TBD",
+                    "hares": "",
                     "time": time_str,
-                    "start": f"Location TBD for {kennel}",
+                    "start": "",
                     "map": "",
                     "hashcash": rule["hashcash"],
                     "turds": "Yes", # Default assumption
                     "tweet": "",
                     "twilight": is_twilight,
                     "date": datetime(year, month, current_date.day),
-                    "desc": f"{kennel} Run #{run_number}",
+                    "desc": "",
                     "update": current_date.strftime("%m/%d/%Y %H:%M")
                 }
                 events.append(event)
@@ -262,8 +290,9 @@ def generate_tsv_events(month, year, kennel_run_numbers):
 
         # Use the correct date format for TSV
         date_str = event['date'].strftime('%A, %B %d, %Y')
-        # BUMPED REVISION TO 1.6
-        update_info = f"(calgen 1.6) {current_utc_time}"
+        # BUMPED REVISION TO 1.7 (for NO-NO-DUH change)
+        current_revision = "(calgen 1.7)"
+        update_info = f"{current_revision} {current_utc_time}"
         
         row = [
             str(event['day']),
@@ -289,13 +318,11 @@ def generate_tsv_events(month, year, kennel_run_numbers):
 
 # Function to generate the HTML for event rows in the MONTHLY PHP file
 def generate_event_rows(month, year):
-    # This is a stub for the full logic which would require event data
-    # Returns 0 for Monday, 6 for Sunday
+    # This remains the same as it correctly generates the PHP calls for a single month's grid
     first_day_of_week = date(year, month, 1).weekday()
     num_days = calendar.monthrange(year, month)[1]
 
     # Adjust for PHP table generation: first_day_of_week needs to be 0=Sunday, 6=Saturday
-    # (Python 0=Mon, 6=Sun) -> ((0+1)%7=1)
     php_first_day_of_week = (first_day_of_week + 1) % 7
 
     html_rows = ""
@@ -318,8 +345,7 @@ def generate_event_rows(month, year):
         # Determine the unique ID for the day (Month - 1 + Day) for the highlighting script
         js_id = f"j{month-1}{day_count}"
         
-        # Determine the current day's color class (needs a mechanism to assign colors based on event density)
-        # For simplicity in this fix, we'll use a placeholder class.
+        # Using a generic class here. The actual color will be applied by the PHP script.
         day_class = "day" 
 
         # Build the HTML for the day cell
@@ -351,7 +377,6 @@ def generate_event_rows(month, year):
 
 
 # This template is for the yearly planning file (e.g., planning.php)
-# FIX 1 (from previous): Removed the problematic inline <style> block that was causing layout issues.
 HTML_HEAD_PLANNING = """
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtmltransitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -490,63 +515,84 @@ HTML_FOOTER_MONTH = """
 </html>
 """
 
-
-def generate_month_block_for_planning(month, year, month_runs):
-    # This is a placeholder for the actual month calendar rendering in the planning view.
-    month_name = calendar.month_name[month]
+# 3) FIX: New function to generate the single, contiguous year grid for planning.php
+def generate_year_grid_for_planning(year):
+    """Generates the full-year daily grid for the planning.php file."""
     
-    # FIX 2 (from previous): Correct the month link format from "01_2026.php" to "$01-2026.php"
-    month_link = f"${str(month).zfill(2)}-{year}.php" 
+    first_day_of_year = date(year, 1, 1)
+    # Python weekday(): 0=Mon, 6=Sun. PHP calendar table: 0=Sun, 6=Sat.
+    # Conversion: (Python_weekday + 1) % 7
+    php_first_day_of_week = (first_day_of_year.weekday() + 1) % 7
     
-    # Simplified HTML Structure for a planning block (keeping a generic wrapper)
-    month_block_head = f"""
-    <div class=month-block>
-        <h2><a href="{month_link}">{month_name} {year}</a></h2>
-        <table class="main"  border="0" cellspacing="0" cellpadding="0">
-            <tr >
-                <th>S</th>
-                <th>M</th>
-                <th>T</th>
-                <th>W</th>
-                <th>T</th>
-                <th>F</th>
-                <th>S</th>
-            </tr>
-    """
+    start_date = date(year, 1, 1)
+    end_date = date(year, 12, 31)
     
-    # Placeholder for a simplified grid (actual logic to place days and events would go here)
-    grid_rows = ""
-    # Example to just show 4 rows for visual effect in planning.php
-    for row in range(4): 
-        grid_rows += '<tr>'
-        for col in range(7):
-            grid_rows += f'<td class="day"><span class="dom">{row*7+col+1 if row*7+col+1 <= 28 else ""}</span></td>'
-        grid_rows += '</tr>\n'
+    html_rows = ""
+    current_date = start_date
 
+    # 1. Start the first week row
+    html_rows += '\t\t\t\t\t<tr>\n'
+    
+    # 2. Fill in empty cells before the first day of the year
+    for i in range(php_first_day_of_week):
+        html_rows += '\t\t\t\t\t\t<td class="empty"></td>\n'
+        
+    day_counter = php_first_day_of_week
+    
+    while current_date <= end_date:
+        
+        # 3. Check if a new row is needed (it's Sunday, which is index 0 in the PHP output's table columns)
+        if day_counter % 7 == 0 and current_date != start_date:
+            html_rows += '\t\t\t\t\t</tr>\n\t\t\t\t\t<tr>\n'
+            
+        # The color class will be dynamically applied by big.php. Use a default.
+        # Using a default class of 'day' or 'red'/'blue' based on the old good sample. 
+        # I'll use a placeholder 'day' which big.php can override.
+        day_class = "day" 
+        
+        # Determine the day text: MonthName DayOfMonth (only for the first day of the month) or just DayOfMonth
+        dom_text = str(current_date.day)
+        if current_date.day == 1:
+            dom_text = f"{MONTH_NAMES[current_date.month]} {current_date.day}"
 
-    return f"{month_block_head} {grid_rows} </table> </div>"
+        # Inner table structure based on the known_good_2019_planning.php (with three rows)
+        html_rows += f'\t\t\t\t\t\t<td class="{day_class}">\n'
+        html_rows += '\t\t\t\t\t\t\t<table class="inner">\n' 
+        html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
+        html_rows += f'\t\t\t\t\t\t\t\t\t<td class="dom">{dom_text}</td>\n'
+        html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
+        html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
+        # PHP call to fill in events
+        html_rows += f'\t\t\t\t\t\t\t\t<td class="event"> <?php fillIn({current_date.month}, {current_date.day}, {year}); ?></td>\n'
+        html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
+        # Extra row from the good planning file sample
+        html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
+        html_rows += '\t\t\t\t\t\t\t\t\t<td class="info"></td>\n'
+        html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
+        html_rows += '\t\t\t\t\t\t\t</table>\n'
+        html_rows += '\t\t\t\t\t\t</td>\n'
+        
+        current_date += timedelta(days=1)
+        day_counter += 1
 
+    # 4. Fill in remaining empty cells at the end of the last week
+    last_day_of_week = (day_counter - 1) % 7 # The last day's position (0-6)
+    if last_day_of_week != 6: # If the last day wasn't Saturday
+        for i in range(last_day_of_week, 6):
+            html_rows += '\t\t\t\t\t\t<td class="empty"></td>\n'
+            
+    # End the last week row
+    html_rows += '\t\t\t\t\t</tr>\n'
+    
+    return html_rows
 
+# 3) FIX: Updated generate_planning_php to use the new grid function
 def generate_planning_php(year, kennel_run_numbers):
-    # FIX 1 (from previous): Using the new HTML_HEAD_PLANNING template without conflicting CSS
     php_content = HTML_HEAD_PLANNING.format(year=year)
     
-    # Start the section that will contain the month blocks
-    # Note: The original full HTML_HEAD_PLANNING had 7 column headers, 
-    # suggesting it was trying to lay out a single large 7-day table. 
-    # Since that approach doesn't work well for 12 month calendars, 
-    # we'll generate 12 small tables and assume custom CSS will handle the 3x4 grid layout.
+    # NEW: Generate the full year grid
+    php_content += generate_year_grid_for_planning(year)
     
-    php_content += "\n"
-    php_content += "<div class='year-container'>\n" # Adding the container needed for month blocks
-    
-    for month in range(1, 13):
-        # The planning page needs event data to populate its mini-calendars, 
-        # but for the generation structure, we only need the month block HTML.
-        # This calls a stub function that includes FIX 2.
-        php_content += generate_month_block_for_planning(month, year, {}) 
-        
-    php_content += "</div>\n"
     php_content += HTML_FOOTER_PLANNING
 
     planning_file_path = f"calendar/{year}/planning.php"
@@ -572,11 +618,9 @@ def generate_files_for_month(month, year, kennel_run_numbers):
         next_year += 1
         
     # Generate link paths
-    # Uses the corrected link format: $MM-YYYY.php
     prev_month_link = f"../{prev_year}/${str(prev_month).zfill(2)}-{prev_year}.php"
     next_month_link = f"../{next_year}/${str(next_month).zfill(2)}-{next_year}.php"
 
-    # kennel_run_numbers is updated by generate_tsv_events to maintain run numbers across months
     tsv_content = generate_tsv_events(month, year, kennel_run_numbers)
     tsv_file_path = f"android/{year}-{str(month).zfill(2)}.txt"
     os.makedirs(os.path.dirname(tsv_file_path), exist_ok=True)
@@ -586,16 +630,16 @@ def generate_files_for_month(month, year, kennel_run_numbers):
     # Generate PHP file content
     month_name = MONTH_NAMES[month]
     year_short = year % 100
-    image_file = f"month-{str(month).zfill(2)}" # Assuming this is the correct pattern for banner images
     
-    # This is the line that was throwing the KeyError due to unescaped braces in the template
-    # FIX: Added 'month=month' to resolve the KeyError: 'month'
+    moon_name = MOON_NAMES.get(month, month_name) # Fallback to month name if not found
+    image_file = f"month-{str(month).zfill(2)}.png"
+    
     php_head = HTML_HEAD_MONTH.format(
         month_name=month_name,
-        month=month, # <--- NEW FIX
+        month=month, 
         year=year,
         year_short=year_short,
-        image_file=image_file,
+        image_file=image_file, # UPDATED IMAGE FILE
         prev_link=prev_month_link,
         next_link=next_month_link
     )
@@ -624,8 +668,6 @@ def generate_files_for_year(year):
 
     # Generate the yearly planning file after all monthly events have been calculated
     print(f"Generating full-year planning file...")
-    # Pass the final run numbers, even though planning.php doesn't use them directly, 
-    # to maintain API consistency
     planning_file_path = generate_planning_php(year, kennel_run_numbers) 
     print(f"Generated: {planning_file_path}")
 
