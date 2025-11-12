@@ -48,6 +48,36 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                         run_number += 1
             temp_run_numbers[kennel] = run_number
             continue
+            
+        # --- 7-ELEVEn Hash Logic (fixed-dates) ---
+        if rule["frequency"] == "fixed-dates":
+            # The fixed dates are 7/11 and 11/7 in the target year
+            fixed_dates_in_year = [datetime(year, 7, 11), datetime(year, 11, 7)]
+            
+            # Filter for events that are in the current month AND on or after the kennel's start_date
+            fixed_events_in_month = []
+            for d in fixed_dates_in_year:
+                if start_of_month.date() <= d.date() <= end_of_month.date():
+                    # Only include runs that are on or after the initial start date to manage run numbering continuity
+                    if d.date() >= start_date.date():
+                        fixed_events_in_month.append(d)
+            
+            for next_event in fixed_events_in_month:
+                sunset_time_str = calculate_sunset_time_dallas(next_event) 
+                
+                event = {
+                    "day": next_event.day, "kennel": kennel, "title": f"{kennel} Run",
+                    "run": run_number, "hares": "", "time": rule["time"],
+                    "start": "", "map": "", "hashcash": rule["hashcash"],
+                    "turds": "Yes", "tweet": "", "twilight": sunset_time_str, 
+                    "date": next_event, "desc": "", 
+                    "update": next_event.strftime("%m/%d/%Y %H:%M")
+                }
+                events.append(event)
+                run_number += 1
+            
+            temp_run_numbers[kennel] = run_number
+            continue
 
         # --- Regular Event Logic ---
         current_date = start_of_month
@@ -305,6 +335,7 @@ def generate_files_for_year(year):
 
     print(f"Generating monthly files for {year}...")
     for month in range(1, 13):
+        # generate_files_for_month updates kennel_run_numbers for the next month
         generate_files_for_month(month, year, kennel_run_numbers)
 
     print(f"Generating full-year planning file...")

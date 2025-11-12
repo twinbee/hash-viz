@@ -17,24 +17,26 @@ MOON_NAMES = {
     7: "Buck", 8: "Sturgeon", 9: "Harvest", 10: "Hunter", 11: "Beaver", 12: "Cold"
 }
 
-# Specification block for initial date and run numbers for each kennel (UPDATED RUN NUMBERS)
+# Specification block for initial date and run numbers for each kennel
 KENNEL_SPECS = {
     "Dallas Hash": {"initial_date": datetime(2024, 1, 6), "run_number": 1214},
     "Ft Worth Hash": {"initial_date": datetime(2024, 1, 13), "run_number": 1048},
     "Dallas Urban Hash": {"initial_date": datetime(2024, 1, 3), "run_number": 834},
     "NO-NO-DUH": {"initial_date": datetime(2024, 1, 15), "run_number": 5}, 
     "YAKH3": {"initial_date": datetime(2024, 6, 2), "run_number": 1}, 
-    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25), "run_number": 87}
+    "Full Moon Hash": {"initial_date": datetime(2024, 1, 25), "run_number": 87},
+    "7-ELEVEn hash house harriers": {"initial_date": datetime(2024, 7, 11), "run_number": 1} # Initial run for continuous count
 }
 
-# Hashcash and schedule rules for each kennel (UPDATED NO-NO-DUH FREQUENCY)
+# Hashcash and schedule rules for each kennel
 KENNEL_RULES = {
     "Dallas Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$10.00 - Pay Online: Paypal $10", "day": "Saturday"},
     "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
     "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
     "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
     "YAKH3": {"frequency": "summer-sundays", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
-    "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"}
+    "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"},
+    "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"} # Fixed run dates 7/11 and 11/7
 }
 
 # Helper dictionary to map rule["day"] name to Python's weekday() (0=Mon, 6=Sun)
@@ -51,13 +53,14 @@ def get_full_moon_icon(month):
     """Returns the icon filename based on the month number (1-12)."""
     return f"Calendar Icons-{str(month).zfill(2)}.png"
 
-# Storing the icon information for each kennel (UPDATED)
+# Storing the icon information for each kennel
 KENNEL_ICONS = {
     "Dallas Urban Hash": "DUH.png",
     "NO-NO-DUH": "nonoduh.png", 
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
-    "Full Moon Hash": get_full_moon_icon
+    "Full Moon Hash": get_full_moon_icon,
+    "7-ELEVEn hash house harriers": "7-ELEVEn.png" 
 }
 
 # --- HTML Templates ---
@@ -119,7 +122,7 @@ HTML_HEAD_MONTH = """
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
 <meta http-equiv="content-type" content="text/html;charset=utf-8" />
-<meta name="generator" content="Calgen 1.7" />
+<meta name="generator" content="Martha's Calendar Generator" />
 <link rel="apple-touch-icon" href="/dfwh3-152x152.png" />
 <title>{month_name}, {year} Hash Events</title>
 <link href="calendar.css" rel="stylesheet" type="text/css" media="all" />
@@ -139,13 +142,17 @@ var id = "j" + d.getMonth() + d.getDate();
 <?php
     $year={year};
     $month={month};
+    // Links are passed from Python for correct cross-year referencing
+    $prev_link="{prev_link}";
+    $next_link="{next_link}";
     include 'php.php';
 ?>
 </head>
 <body>
 <map name="Map" id="Map">
     <area shape="rect" coords="0,0,150,91" href="{prev_link}" alt="Previous Month" />
-    <area shape="rect" coords="957,0,1107,91" href="{next_link}" alt="Next Month" />
+    <!-- FIXED: Using coordinates 957,0,807,91 as requested for the Next Month button -->
+    <area shape="rect" coords="957,0,807,91" href="{next_link}" alt="Next Month" />
 </map>
 <div class=container>
     <table class="overall"  border="0" cellspacing="0" cellpadding="0">

@@ -195,7 +195,7 @@ def calculate_next_event(kennel, start_date, current_date, frequency):
         delta = timedelta(weeks=4)
         if frequency == "summer-sundays" and current_date.month not in [6, 7, 8]:
              return None
-    elif frequency == "full-moon":
+    elif frequency == "full-moon" or frequency == "fixed-dates":
         return None
     else:
         return None
