@@ -207,9 +207,44 @@ def generate_event_rows(month, year):
     return html_rows
 
 
+def load_previous_year_events(year):
+    """Loads all events from the previous year's android TSV files."""
+    previous_year = year - 1
+    events_by_date = {}  # Key: (month, day), Value: list of event titles
+    
+    for month in range(1, 13):
+        tsv_file_path = f"android/{previous_year}-{str(month).zfill(2)}.txt"
+        if not os.path.exists(tsv_file_path):
+            continue
+            
+        try:
+            with open(tsv_file_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+                
+            # Skip header line
+            for line in lines[1:]:
+                parts = line.strip().split('\t')
+                if len(parts) >= 4:  # Ensure we have at least day, kennel, icon, title
+                    day = int(parts[0])
+                    title = parts[3]  # title field
+                    
+                    if title:  # Only add if title is not empty
+                        date_key = (month, day)
+                        if date_key not in events_by_date:
+                            events_by_date[date_key] = []
+                        events_by_date[date_key].append(title)
+        except Exception as e:
+            print(f"Warning: Could not read {tsv_file_path}: {e}")
+            continue
+    
+    return events_by_date
+
+
 def generate_year_grid_for_planning(year):
     """Generates the full-year daily grid for the planning.php file, marking holidays in red/blue."""
     special_dates = get_special_dates_for_year(year) 
+    previous_year_events = load_previous_year_events(year)
+    
     first_day_of_year = datetime(year, 1, 1).date()
     php_first_day_of_week = (first_day_of_year.weekday() + 1) % 7 # 0=Sun, 6=Sat
     
@@ -230,6 +265,7 @@ def generate_year_grid_for_planning(year):
             
         date_key = (current_date.month, current_date.day)
         special_info = special_dates.get(date_key)
+        prev_year_titles = previous_year_events.get(date_key, [])
         
         dom_text = str(current_date.day)
         if current_date.day == 1:
@@ -250,7 +286,14 @@ def generate_year_grid_for_planning(year):
 
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
-        html_rows += f'\t\t\t\t\t\t\t\t<td class="event"> <?php fillIn({current_date.month}, {current_date.day}, {year}); ?></td>\n'
+        html_rows += f'\t\t\t\t\t\t\t\t<td class="event"> <?php fillIn({current_date.month}, {current_date.day}, {year}); ?>'
+        
+        # Add previous year events as small text at the bottom
+        if prev_year_titles:
+            for title in prev_year_titles:
+                html_rows += f'<br/><small>{year - 1} {title}</small>'
+        
+        html_rows += '</td>\n'
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
         html_rows += '\t\t\t\t\t\t\t</table>\n'
         html_rows += '\t\t\t\t\t\t</td>\n'
