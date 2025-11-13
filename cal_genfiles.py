@@ -48,6 +48,50 @@ def generate_tsv_events(month, year, kennel_run_numbers):
                         run_number += 1
             temp_run_numbers[kennel] = run_number
             continue
+        
+        # --- YAKH3 Logic (bi-weekly from 3rd Sunday in April through 3rd Sunday in September) ---
+        if rule["frequency"] == "yakh3-summer":
+            # Find the third Sunday in April for this year
+            april_first = datetime(year, 4, 1)
+            # Find first Sunday in April
+            days_to_sunday = (6 - april_first.weekday()) % 7
+            first_sunday_april = april_first + timedelta(days=days_to_sunday)
+            # Third Sunday is 2 weeks after first Sunday
+            third_sunday_april = first_sunday_april + timedelta(weeks=2)
+            
+            # Find the third Sunday in September for this year
+            sept_first = datetime(year, 9, 1)
+            # Find first Sunday in September
+            days_to_sunday = (6 - sept_first.weekday()) % 7
+            first_sunday_sept = sept_first + timedelta(days=days_to_sunday)
+            # Third Sunday is 2 weeks after first Sunday
+            third_sunday_sept = first_sunday_sept + timedelta(weeks=2)
+            
+            # Generate events every other Sunday from third Sunday in April through third Sunday in September
+            current_event_date = third_sunday_april
+            while current_event_date <= third_sunday_sept:
+                # Only add if this event falls within the current month we're generating
+                if start_of_month.date() <= current_event_date.date() <= end_of_month.date():
+                    # Only include runs that are on or after the initial start date
+                    if current_event_date.date() >= start_date.date():
+                        sunset_time_str = calculate_sunset_time_dallas(current_event_date)
+                        
+                        event = {
+                            "day": current_event_date.day, "kennel": kennel, "title": "",
+                            "run": run_number, "hares": "", "time": rule["time"],
+                            "start": "", "map": "", "hashcash": rule["hashcash"],
+                            "turds": "", "tweet": "", "twilight": sunset_time_str, 
+                            "date": current_event_date, "desc": "", 
+                            "update": current_event_date.strftime("%m/%d/%Y %H:%M")
+                        }
+                        events.append(event)
+                        run_number += 1
+                
+                # Move to next event (2 weeks later)
+                current_event_date += timedelta(weeks=2)
+            
+            temp_run_numbers[kennel] = run_number
+            continue
             
         # --- 7-ELEVEn Hash Logic (fixed-dates) ---
         if rule["frequency"] == "fixed-dates":

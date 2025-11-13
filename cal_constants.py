@@ -23,7 +23,7 @@ KENNEL_SPECS = {
     "Ft Worth Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 1049},
     "Dallas Urban Hash": {"initial_date": datetime(2026, 1, 7), "run_number": 834},
     "NO-NO-DUH": {"initial_date": datetime(2024, 1, 19), "run_number": 5}, 
-    "YAKH3": {"initial_date": datetime(2026, 6, 2), "run_number": 1}, 
+    "YAKH3": {"initial_date": datetime(2026, 4, 19), "run_number": 1}, 
     "Full Moon Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 87},
     "7-ELEVEn hash house harriers": {"initial_date": datetime(2026, 7, 11), "run_number": 1} # Initial run for continuous count
 }
@@ -34,7 +34,7 @@ KENNEL_RULES = {
     "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
     "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
     "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
-    "YAKH3": {"frequency": "summer-sundays", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
+    "YAKH3": {"frequency": "yakh3-summer", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
     "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"},
     "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"} # Fixed run dates 7/11 and 11/7
 }
@@ -60,7 +60,8 @@ KENNEL_ICONS = {
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
     "Full Moon Hash": get_full_moon_icon,
-    "7-ELEVEn hash house harriers": "7-ELEVEn.png" 
+    "7-ELEVEn hash house harriers": "7-ELEVEn.png", 
+    "YAKH3": "YAKH3.png" 
 }
 
 # --- HTML Templates ---
