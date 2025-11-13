@@ -89,6 +89,15 @@ def generate_tsv_events(month, year, kennel_run_numbers):
         current_date += timedelta(days=days_to_add)
 
         while current_date <= end_of_month:
+            # Check if this date is on or after the kennel's initial date
+            if current_date.date() < start_date.date():
+                # Skip dates before the kennel's initial date for this year
+                if rule["frequency"] == "weekly":
+                    current_date += timedelta(weeks=1)
+                else:
+                    current_date += timedelta(days=7)
+                continue
+                
             expected_event_date_dt = calculate_next_event(kennel, start_date, current_date, rule["frequency"])
 
             if expected_event_date_dt and expected_event_date_dt.date() == current_date.date():
@@ -210,7 +219,7 @@ def generate_event_rows(month, year):
 def load_previous_year_events(year):
     """Loads all events from the previous year's android TSV files."""
     previous_year = year - 1
-    events_by_date = {}  # Key: (month, day), Value: list of event titles
+    events_by_date = {}  # Key: (month, day), Value: list of (title, hares) tuples
     
     for month in range(1, 13):
         tsv_file_path = f"android/{previous_year}-{str(month).zfill(2)}.txt"
@@ -224,15 +233,16 @@ def load_previous_year_events(year):
             # Skip header line
             for line in lines[1:]:
                 parts = line.strip().split('\t')
-                if len(parts) >= 4:  # Ensure we have at least day, kennel, icon, title
+                if len(parts) >= 6:  # Ensure we have at least day, kennel, icon, title, run, hares
                     day = int(parts[0])
                     title = parts[3]  # title field
+                    hares = parts[5]  # hares field
                     
                     if title:  # Only add if title is not empty
                         date_key = (month, day)
                         if date_key not in events_by_date:
                             events_by_date[date_key] = []
-                        events_by_date[date_key].append(title)
+                        events_by_date[date_key].append((title, hares))
         except Exception as e:
             print(f"Warning: Could not read {tsv_file_path}: {e}")
             continue
@@ -265,7 +275,7 @@ def generate_year_grid_for_planning(year):
             
         date_key = (current_date.month, current_date.day)
         special_info = special_dates.get(date_key)
-        prev_year_titles = previous_year_events.get(date_key, [])
+        prev_year_events = previous_year_events.get(date_key, [])
         
         dom_text = str(current_date.day)
         if current_date.day == 1:
@@ -286,15 +296,24 @@ def generate_year_grid_for_planning(year):
 
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
-        html_rows += f'\t\t\t\t\t\t\t\t<td class="event"> <?php fillIn({current_date.month}, {current_date.day}, {year}); ?>'
-        
-        # Add previous year events as small text at the bottom
-        if prev_year_titles:
-            for title in prev_year_titles:
-                html_rows += f'<br/><small>{year - 1} {title}</small>'
-        
-        html_rows += '</td>\n'
+        html_rows += f'\t\t\t\t\t\t\t\t<td class="event"> <?php fillIn({current_date.month}, {current_date.day}, {year}); ?></td>\n'
         html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
+        
+        # Add previous year events as small red text at the bottom in a separate row
+        if prev_year_events:
+            html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
+            html_rows += '\t\t\t\t\t\t\t\t<td class="event" style="font-size: 8px; color: #cc0000; padding-top: 2px;">'
+            for i, (title, hares) in enumerate(prev_year_events):
+                if i > 0:
+                    html_rows += '<br/>'
+                # Format: "2025 - Title - Hares" or "2025 - Title" if no hares
+                if hares:
+                    html_rows += f'{year - 1} - {title} - {hares}'
+                else:
+                    html_rows += f'{year - 1} - {title}'
+            html_rows += '</td>\n'
+            html_rows += '\t\t\t\t\t\t\t\t</tr>\n'
+        
         html_rows += '\t\t\t\t\t\t\t</table>\n'
         html_rows += '\t\t\t\t\t\t</td>\n'
         
@@ -319,7 +338,7 @@ def generate_planning_php(year, kennel_run_numbers):
 
     planning_file_path = f"calendar/{year}/planning.php"
     os.makedirs(os.path.dirname(planning_file_path), exist_ok=True)
-    with open(planning_file_path, 'w') as php_file:
+    with open(planning_file_path, 'w', encoding='utf-8') as php_file:
         php_file.write(php_content)
     
     return planning_file_path
@@ -360,7 +379,7 @@ def generate_files_for_month(month, year, kennel_run_numbers):
     
     tsv_file_path = f"android/{year}-{str(month).zfill(2)}.txt"
     os.makedirs(os.path.dirname(tsv_file_path), exist_ok=True)
-    with open(tsv_file_path, 'w') as tsv_file:
+    with open(tsv_file_path, 'w', encoding='utf-8') as tsv_file:
         tsv_file.write(tsv_content)
 
     # --- Generate PHP File ---
@@ -381,7 +400,7 @@ def generate_files_for_month(month, year, kennel_run_numbers):
     # Note: The output filename contains the dollar sign to match the legacy file structure
     php_file_path = f"calendar/{year}/${str(month).zfill(2)}-{year}.php"
     os.makedirs(os.path.dirname(php_file_path), exist_ok=True)
-    with open(php_file_path, 'w') as php_file:
+    with open(php_file_path, 'w', encoding='utf-8') as php_file:
         php_file.write(php_content)
 
     return php_file_path, tsv_file_path
