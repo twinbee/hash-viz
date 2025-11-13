@@ -24,8 +24,10 @@ KENNEL_SPECS = {
     "Dallas Urban Hash": {"initial_date": datetime(2026, 1, 7), "run_number": 834},
     "NO-NO-DUH": {"initial_date": datetime(2024, 1, 19), "run_number": 5}, 
     "YAKH3": {"initial_date": datetime(2026, 4, 19), "run_number": 1}, 
+    "YakH3-HH": {"initial_date": datetime(2026, 6, 5), "run_number": 1},
+    "Grapevine Quarterly Hash": {"initial_date": datetime(2026, 3, 13), "run_number": 1},
     "Full Moon Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 87},
-    "7-ELEVEn hash house harriers": {"initial_date": datetime(2026, 7, 11), "run_number": 1} # Initial run for continuous count
+    "7-ELEVEn hash house harriers": {"initial_date": datetime(2026, 7, 11), "run_number": 1}
 }
 
 # Hashcash and schedule rules for each kennel
@@ -35,8 +37,10 @@ KENNEL_RULES = {
     "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
     "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
     "YAKH3": {"frequency": "yakh3-summer", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
+    "YakH3-HH": {"frequency": "yakh3hh-summer", "time": "7:00 PM", "hashcash": "", "day": "Friday"},
+    "Grapevine Quarterly Hash": {"frequency": "gqh-quarterly", "time": "7:00 PM", "hashcash": "", "day": "irrelevant"},
     "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"},
-    "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"} # Fixed run dates 7/11 and 11/7
+    "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"}
 }
 
 # Helper dictionary to map rule["day"] name to Python's weekday() (0=Mon, 6=Sun)
@@ -59,9 +63,11 @@ KENNEL_ICONS = {
     "NO-NO-DUH": "nonoduh.png", 
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
+    "YAKH3": "YAKH3.png",
+    "YakH3-HH": "YAKH3-HH.png",
+    "Grapevine Quarterly Hash": "GQhash.png",
     "Full Moon Hash": get_full_moon_icon,
-    "7-ELEVEn hash house harriers": "7-ELEVEn.png", 
-    "YAKH3": "YAKH3.png" 
+    "7-ELEVEn hash house harriers": "7-ELEVEn.png"
 }
 
 # --- HTML Templates ---

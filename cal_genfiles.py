@@ -92,6 +92,73 @@ def generate_tsv_events(month, year, kennel_run_numbers):
             
             temp_run_numbers[kennel] = run_number
             continue
+        
+        # --- YakH3-HH Logic (monthly Fridays from June 5 through Sept 4) ---
+        if rule["frequency"] == "yakh3hh-summer":
+            # Define the date range: June 5 through Sept 4
+            june_5 = datetime(year, 6, 5)
+            sept_4 = datetime(year, 9, 4)
+            
+            # Find the first Friday on or after June 5
+            current_event_date = june_5
+            days_to_friday = (4 - current_event_date.weekday()) % 7  # Friday is 4
+            if days_to_friday > 0:
+                current_event_date += timedelta(days=days_to_friday)
+            
+            # Generate monthly (4-week) Friday events from June 5 through Sept 4
+            while current_event_date <= sept_4:
+                # Only add if this event falls within the current month we're generating
+                if start_of_month.date() <= current_event_date.date() <= end_of_month.date():
+                    # Only include runs that are on or after the initial start date
+                    if current_event_date.date() >= start_date.date():
+                        sunset_time_str = calculate_sunset_time_dallas(current_event_date)
+                        
+                        event = {
+                            "day": current_event_date.day, "kennel": kennel, "title": "",
+                            "run": run_number, "hares": "", "time": rule["time"],
+                            "start": "", "map": "", "hashcash": rule["hashcash"],
+                            "turds": "", "tweet": "", "twilight": sunset_time_str, 
+                            "date": current_event_date, "desc": "", 
+                            "update": current_event_date.strftime("%m/%d/%Y %H:%M")
+                        }
+                        events.append(event)
+                        run_number += 1
+                
+                # Move to next event (4 weeks later for monthly)
+                current_event_date += timedelta(weeks=4)
+            
+            temp_run_numbers[kennel] = run_number
+            continue
+        
+        # --- Grapevine Quarterly Hash Logic (quarterly on the 13th: Mar, Jun, Sep, Dec) ---
+        if rule["frequency"] == "gqh-quarterly":
+            quarterly_dates = [
+                datetime(year, 3, 13),
+                datetime(year, 6, 13),
+                datetime(year, 9, 13),
+                datetime(year, 12, 13)
+            ]
+            
+            for quarterly_date in quarterly_dates:
+                # Only add if this event falls within the current month we're generating
+                if start_of_month.date() <= quarterly_date.date() <= end_of_month.date():
+                    # Only include runs that are on or after the initial start date
+                    if quarterly_date.date() >= start_date.date():
+                        sunset_time_str = calculate_sunset_time_dallas(quarterly_date)
+                        
+                        event = {
+                            "day": quarterly_date.day, "kennel": kennel, "title": "",
+                            "run": run_number, "hares": "", "time": rule["time"],
+                            "start": "", "map": "", "hashcash": rule["hashcash"],
+                            "turds": "", "tweet": "", "twilight": sunset_time_str, 
+                            "date": quarterly_date, "desc": "", 
+                            "update": quarterly_date.strftime("%m/%d/%Y %H:%M")
+                        }
+                        events.append(event)
+                        run_number += 1
+            
+            temp_run_numbers[kennel] = run_number
+            continue
             
         # --- 7-ELEVEn Hash Logic (fixed-dates) ---
         if rule["frequency"] == "fixed-dates":
@@ -299,6 +366,13 @@ def generate_year_grid_for_planning(year):
     special_dates = get_special_dates_for_year(year) 
     previous_year_events = load_previous_year_events(year)
     
+    # Month background colors for alternating visual distinction
+    month_colors = {
+        1: "#E6F2FF", 2: "#FFE6F0", 3: "#E6FFE6", 4: "#FFF9E6",
+        5: "#F0E6FF", 6: "#FFE6E6", 7: "#E6FFFF", 8: "#FFF0E6",
+        9: "#E6F0FF", 10: "#FFE6F9", 11: "#F0FFE6", 12: "#E6E6FF"
+    }
+    
     first_day_of_year = datetime(year, 1, 1).date()
     php_first_day_of_week = (first_day_of_year.weekday() + 1) % 7 # 0=Sun, 6=Sat
     
@@ -321,12 +395,14 @@ def generate_year_grid_for_planning(year):
         special_info = special_dates.get(date_key)
         prev_year_events = previous_year_events.get(date_key, [])
         
-        dom_text = str(current_date.day)
-        if current_date.day == 1:
-            dom_text = f"{MONTH_NAMES[current_date.month]} {current_date.day}"
+        # Get background color for this month
+        bg_color = month_colors.get(current_date.month, "#FFFFFF")
+        
+        # Always show full month and day (e.g., "June 3")
+        dom_text = f"{MONTH_NAMES[current_date.month]} {current_date.day}"
 
-        # The outer td always has class="day"
-        html_rows += '\t\t\t\t\t\t<td class="day">\n'
+        # The outer td always has class="day" with month-specific background color
+        html_rows += f'\t\t\t\t\t\t<td class="day" style="background-color: {bg_color};">\n'
         html_rows += '\t\t\t\t\t\t\t<table class="inner">\n' 
         html_rows += '\t\t\t\t\t\t\t\t<tr>\n'
         

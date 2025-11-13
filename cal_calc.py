@@ -227,7 +227,7 @@ def calculate_next_event(kennel, start_date, current_date, frequency):
         delta = timedelta(weeks=4)
         if frequency == "summer-sundays" and current_date.month not in [6, 7, 8]:
              return None
-    elif frequency == "full-moon" or frequency == "fixed-dates" or frequency == "yakh3-summer":
+    elif frequency == "full-moon" or frequency == "fixed-dates" or frequency == "yakh3-summer" or frequency == "yakh3hh-summer" or frequency == "gqh-quarterly":
         # These frequencies are handled separately in generate_tsv_events
         return None
     else:
