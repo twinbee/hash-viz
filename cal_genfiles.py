@@ -26,6 +26,22 @@ def generate_tsv_events(month, year, kennel_run_numbers):
         start_date = spec["initial_date"]
         run_number = temp_run_numbers[kennel]
         rule = KENNEL_RULES[kennel]
+        
+        # Automatically adjust initial_date to the first matching day of week for regular events
+        if rule["frequency"] in ["weekly", "bi-weekly", "monthly"]:
+            expected_day = DAY_MAP.get(rule["day"])
+            actual_day = start_date.weekday()
+            if expected_day != actual_day:
+                # Calculate days to add to reach the correct day of week
+                days_to_add = (expected_day - actual_day + 7) % 7
+                if days_to_add == 0:
+                    days_to_add = 7  # Move to next week if already on correct day
+                adjusted_date = start_date + timedelta(days=days_to_add)
+                
+                day_names = {v: k for k, v in DAY_MAP.items()}
+                print(f"INFO: {kennel} initial_date {start_date.strftime('%Y-%m-%d')} ({day_names[actual_day]}) "
+                      f"adjusted to {adjusted_date.strftime('%Y-%m-%d')} ({rule['day']}) to match schedule.")
+                start_date = adjusted_date
 
         # --- Full Moon Hash Logic ---
         if rule["frequency"] == "full-moon":

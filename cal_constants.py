@@ -19,15 +19,15 @@ MOON_NAMES = {
 
 # Specification block for initial date and run numbers for each kennel
 KENNEL_SPECS = {
-    "Dallas Hash": {"initial_date": datetime(2026, 1, 10), "run_number": 1215},
-    "Ft Worth Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 1049},
-    "Dallas Urban Hash": {"initial_date": datetime(2026, 1, 7), "run_number": 834},
-    "NO-NO-DUH": {"initial_date": datetime(2024, 1, 19), "run_number": 5}, 
-    "YAKH3": {"initial_date": datetime(2026, 4, 19), "run_number": 1}, 
-    "YakH3-HH": {"initial_date": datetime(2026, 6, 5), "run_number": 1},
-    "Grapevine Quarterly Hash": {"initial_date": datetime(2026, 3, 13), "run_number": 1},
-    "Full Moon Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 87},
-    "7-ELEVEn hash house harriers": {"initial_date": datetime(2026, 7, 11), "run_number": 1}
+    "Dallas Hash": {"initial_date": datetime(2027, 1, 9), "run_number": 1241},
+    "Ft Worth Hash": {"initial_date": datetime(2027, 1, 2), "run_number": 1075},
+    "Dallas Urban Hash": {"initial_date": datetime(2027, 1, 6), "run_number": 885},
+    "NO-NO-DUH": {"initial_date": datetime(2027, 1, 18), "run_number": 17}, 
+    "YAKH3": {"initial_date": datetime(2027, 4, 18), "run_number": 1}, 
+    "YakH3-HH": {"initial_date": datetime(2027, 6, 4), "run_number": 1},
+    "Grapevine Quarterly Hash": {"initial_date": datetime(2027, 3, 13), "run_number": 1},
+    "Full Moon Hash": {"initial_date": datetime(2027, 1, 3), "run_number": 99},
+    "7-ELEVEn hash house harriers": {"initial_date": datetime(2027, 7, 11), "run_number": 711}
 }
 
 # Hashcash and schedule rules for each kennel
