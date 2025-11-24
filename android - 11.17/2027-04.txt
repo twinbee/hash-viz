@@ -1,0 +1,12 @@
+day	kennel	icon	title	run	hares	time	start	map	hashcash	turds	tweet	twilight	date	desc	update
+3	Dallas Hash	dallas.png		1247		2:00 PM			$10.00 - Pay Online: Paypal $10			7:48 PM	Saturday, April 03, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+7	Dallas Urban Hash	DUH.png		898		6:30 PM						7:51 PM	Wednesday, April 07, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+10	Ft Worth Hash	ftworth.png		1082		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:53 PM	Saturday, April 10, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+12	NO-NO-DUH	nonoduh.png		20		7:00 PM			$7.00			7:54 PM	Monday, April 12, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+14	Dallas Urban Hash	DUH.png		899		6:30 PM						7:56 PM	Wednesday, April 14, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+17	Dallas Hash	dallas.png		1248		2:00 PM			$10.00 - Pay Online: Paypal $10			7:58 PM	Saturday, April 17, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+18	YAKH3	YAKH3.png		1		12:00 PM						7:59 PM	Sunday, April 18, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+20	Full Moon Hash	Calendar Icons-04.png		102		varies						8:00 PM	Tuesday, April 20, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+21	Dallas Urban Hash	DUH.png		900		6:30 PM						8:01 PM	Wednesday, April 21, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+24	Ft Worth Hash	ftworth.png		1083		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:03 PM	Saturday, April 24, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+28	Dallas Urban Hash	DUH.png		901		6:30 PM						8:06 PM	Wednesday, April 28, 2027		(calgen 1.7) 11/14/2025 14:46 UTC

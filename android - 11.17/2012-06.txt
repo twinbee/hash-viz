@@ -1,0 +1,10 @@
+1	Happy Hour	hh	Sherlock's Addison			7:00 PM CDT						8:59 PM CDT	Friday, June 1, 2012		 
+2	Dallas Hash	dh	HELL-ment Hash	851	Pink Panty Poacher &amp;amp; Just Sheri	3:00 PM CDT			$7.00			8:59 PM CDT	Saturday, June 2, 2012		 
+4	Taco Night	tn		457		7:00 PM CDT						9:00 PM CDT	Monday, June 4, 2012		 
+13	Taco Night	tn		457		7:00 PM CDT						9:00 PM CDT	Wednesday, June 13, 2012		 
+14	Taco Night	tn		457		7:00 PM CDT						9:00 PM CDT	Thursday, June 14, 2012		 
+23	Taco Night	tn		457		7:00 PM CDT						9:01 PM CDT	Saturday, June 23, 2012		 
+25	Taco Night	tn		457		7:00 PM CDT						9:01 PM CDT	Monday, June 25, 2012		 
+28	Dallas Urban Hash	du		457		5:00 PM CDT			$7.00			9:01 PM CDT	Thursday, June 28, 2012		 
+28	Fort Worth Hash	fw		457		5:01 PM CDT			$7.00			9:01 PM CDT	Thursday, June 28, 2012		 
+28	Taco Night	tn		457		7:00 PM CDT						9:01 PM CDT	Thursday, June 28, 2012		 

@@ -1,0 +1,16 @@
+day	kennel	icon	title	run	hares	time	start	map	hashcash	turds	tweet	twilight	date	desc	update
+2	Dallas Urban Hash	DUH.png		906		6:30 PM						8:30 PM	Wednesday, June 02, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+5	Ft Worth Hash	ftworth.png		1086		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:32 PM	Saturday, June 05, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+7	NO-NO-DUH	nonoduh.png		22		7:00 PM			$7.00			8:33 PM	Monday, June 07, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+9	Dallas Urban Hash	DUH.png		907		6:30 PM						8:34 PM	Wednesday, June 09, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+11	YakH3-HH	YAKH3-HH.png		1		7:00 PM						8:35 PM	Friday, June 11, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+12	Dallas Hash	dallas.png		1252		2:00 PM			$10.00 - Pay Online: Paypal $10			8:35 PM	Saturday, June 12, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+13	YAKH3	YAKH3.png		5		12:00 PM						8:36 PM	Sunday, June 13, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+13	Grapevine Quarterly Hash	GQhash.png		2		7:00 PM						8:36 PM	Sunday, June 13, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+16	Dallas Urban Hash	DUH.png		908		6:30 PM						8:37 PM	Wednesday, June 16, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+18	Full Moon Hash	Calendar Icons-06.png		104		varies						8:37 PM	Friday, June 18, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+19	Ft Worth Hash	ftworth.png		1087		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:38 PM	Saturday, June 19, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+23	Dallas Urban Hash	DUH.png		909		6:30 PM						8:39 PM	Wednesday, June 23, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+26	Dallas Hash	dallas.png		1253		2:00 PM			$10.00 - Pay Online: Paypal $10			8:39 PM	Saturday, June 26, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+27	YAKH3	YAKH3.png		6		12:00 PM						8:39 PM	Sunday, June 27, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+30	Dallas Urban Hash	DUH.png		910		6:30 PM						8:39 PM	Wednesday, June 30, 2027		(calgen 1.7) 11/14/2025 14:46 UTC

@@ -1,0 +1,13 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+3	Dallas Urban Hash	DUH.png		855		6:30 PM						8:31 PM	Wednesday, June 03, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+5	YakH3-HH	YAKH3-HH.png		HH# 1		7:00 PM						8:32 PM	Friday, June 05, 2026		11/17/25 8:03 (YakMan) 1.28
+6	Ft Worth Hash	ftworth.png		1060		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:32 PM	Saturday, June 06, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+10	Dallas Urban Hash	DUH.png		856		6:30 PM						8:34 PM	Wednesday, June 10, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+13	Dallas Hash	dallas.png		1226		2:00 PM			$10.00 - Pay Online: Paypal $10			8:36 PM	Saturday, June 13, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+13	Grapevine Quarterly Hash	GQhash.png		2		7:00 PM						8:36 PM	Saturday, June 13, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+14	YAKH3	YAKH3.png		S.9 | E.5		12:00 PM						8:36 PM	Sunday, June 14, 2026		11/17/25 8:03 (YakMan) 1.28
+17	Dallas Urban Hash	DUH.png		857		6:30 PM						8:37 PM	Wednesday, June 17, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+20	Ft Worth Hash	ftworth.png	EOP DAY 1 Spit Hash 	1061	MeatStump & Patch Kid & Wet Spot	2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:38 PM	Saturday, June 20, 2026		11/14/25 16:31 (TannedPeaches) 1.28
+24	Dallas Urban Hash	DUH.png		858		6:30 PM						8:39 PM	Wednesday, June 24, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+27	Dallas Hash	dallas.png		1227		2:00 PM			$10.00 - Pay Online: Paypal $10			8:39 PM	Saturday, June 27, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+28	YAKH3	YAKH3.png		S.9 | E.6		12:00 PM						8:39 PM	Sunday, June 28, 2026		11/17/25 8:03 (YakMan) 1.28

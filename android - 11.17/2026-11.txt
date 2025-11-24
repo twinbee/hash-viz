@@ -1,0 +1,10 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+4	Dallas Urban Hash	DUH.png		877		6:30 PM						5:35 PM	Wednesday, November 04, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+7	Ft Worth Hash	ftworth.png	Marine B-Day Hash	1071	Son of a peach	2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			5:32 PM	Saturday, November 07, 2026		11/14/25 16:43 (TannedPeaches) 1.28
+7	7-ELEVEn hash house harriers	eleven7-200x99.png	7-ELEVEn invades the corps	4		2:00 PM to 7:11 PM	wherever the Marine Corps hash is on this day		$7.11 in addition to paying Ft Worth 		what is a tweet?	5:32 PM	Saturday, November 07, 2026	This is on 11-7, when we invade the Marine Corps Hash. Wear 7-ELEVEn apparel or colors (orange, green, red, and white). Join our tribe in the Marine Corps hash and follow our flag, to gain access to extra Beer checks and refreshments (all 7 of them must be at a 7-ELEVEn). When called upon, sing only one song: "Seven Eleven, Down Down!"	11/17/25 11:27 (kitchen) 1.28
+11	Dallas Urban Hash	DUH.png		878		6:30 PM						5:29 PM	Wednesday, November 11, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+14	Dallas Hash	dallas.png		1237		2:00 PM			$10.00 - Pay Online: Paypal $10			5:27 PM	Saturday, November 14, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+18	Dallas Urban Hash	DUH.png		879		6:30 PM						5:25 PM	Wednesday, November 18, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+21	Ft Worth Hash	ftworth.png		1072		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			5:24 PM	Saturday, November 21, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+25	Dallas Urban Hash	DUH.png		880		6:30 PM						5:22 PM	Wednesday, November 25, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+28	Dallas Hash	dallas.png		1238		2:00 PM			$10.00 - Pay Online: Paypal $10			5:21 PM	Saturday, November 28, 2026		(calgen 1.7) 11/13/2025 13:46 UTC

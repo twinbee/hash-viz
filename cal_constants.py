@@ -39,7 +39,7 @@ KENNEL_RULES = {
     "YAKH3": {"frequency": "yakh3-summer", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
     "YakH3-HH": {"frequency": "yakh3hh-summer", "time": "7:00 PM", "hashcash": "", "day": "Friday"},
     "Grapevine Quarterly Hash": {"frequency": "gqh-quarterly", "time": "7:00 PM", "hashcash": "", "day": "irrelevant"},
-    "Full Moon Hash": {"frequency": "full-moon", "time": "varies", "hashcash": "", "day": "full-moon"},
+    "Full Moon Hash": {"frequency": "full-moon", "time": "7:00 PM", "hashcash": "", "day": "full-moon"},
     "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"}
 }
 

@@ -1,0 +1,15 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+1	Dallas Urban Hash	DUH.png		859		6:30 PM						8:39 PM	Wednesday, July 01, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+3	YakH3-HH	YAKH3-HH.png		HH# 2		7:00 PM						8:39 PM	Friday, July 03, 2026		11/17/25 8:03 (YakMan) 1.28
+4	Ft Worth Hash	ftworth.png		1062	Son of a peach	2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:39 PM	Saturday, July 04, 2026		11/13/25 15:18 (TannedPeaches) 1.28
+8	Dallas Urban Hash	DUH.png		860		6:30 PM						8:39 PM	Wednesday, July 08, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+11	Dallas Hash	dallas.png	7-ELEVEn invades Dallas H3	1228	Likes It In the Kitchen and LGBT	2:00 PM	parking lot of <br /><br />7-Eleven Store National Support Center<br />3200 Hackberry Rd, Irving, TX 75063	https://maps.app.goo.gl/MTjNnqczC6Eb2CvP8	 $10.00 - Pay Online: <A HREF="https://paypal.me/DallasH3DFW/10">Paypal $10</A>	Yes		8:38 PM	Saturday, July 11, 2026	The 7-ELEVEn hash is invading Dallas H3. Download the app to get your free slurpee. <br /><br /><br />Wear green and orange, any 7-ELEVEn apparel you have. Bring duct tape or money to buy it at a 7-ELEVEn.<br /><br />Every beer check must be at a 7-ELEVEn!<br /><br />There is one song and one song only; "Seven-eleven, down down!"<br /><br />Announcements: the next 7/11 hash is - as always on 7/11 at a 7/11.<br /><br />Declare the wisest wizard by counting the number of beers or alcoholic drinks they have taped together in their wizard staff. the coffee you drank and taped on doesn't count.<br /><br />Bow with staffs in the direction of the closest 7/11 with one last song.<br /><br />Wizard staff jousting / sword fights afterwards.<br />	11/13/25 16:39 (kitchen) 1.28
+11	7-ELEVEn hash house harriers	7-ELEVEn.png	Joint with the Dallas H3	1		7:00 PM			$7.11			8:38 PM	Saturday, July 11, 2026		11/13/25 16:39 (kitchen) 1.28
+12	YAKH3	YAKH3.png		S.9 | E.7		12:00 PM						8:38 PM	Sunday, July 12, 2026		11/17/25 8:03 (YakMan) 1.28
+15	Dallas Urban Hash	DUH.png		861		6:30 PM						8:37 PM	Wednesday, July 15, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+18	Ft Worth Hash	ftworth.png		1063		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:35 PM	Saturday, July 18, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+22	Dallas Urban Hash	DUH.png		862		6:30 PM						8:33 PM	Wednesday, July 22, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+25	Dallas Hash	dallas.png		1229		2:00 PM			$10.00 - Pay Online: Paypal $10			8:32 PM	Saturday, July 25, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+26	YAKH3	YAKH3.png		S.9 | E.8		12:00 PM						8:31 PM	Sunday, July 26, 2026		11/17/25 8:04 (YakMan) 1.28
+29	Dallas Urban Hash	DUH.png		863		6:30 PM						8:29 PM	Wednesday, July 29, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+31	YakH3-HH	YAKH3-HH.png		3		7:00 PM						8:27 PM	Friday, July 31, 2026		(calgen 1.7) 11/13/2025 13:46 UTC

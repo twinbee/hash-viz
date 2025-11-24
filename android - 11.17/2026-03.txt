@@ -1,0 +1,10 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+4	Dallas Urban Hash	DUH.png		842		6:30 PM						6:26 PM	Wednesday, March 04, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+7	Dallas Hash	dallas.png		1219		2:00 PM			$10.00 - Pay Online: Paypal $10			6:28 PM	Saturday, March 07, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+11	Dallas Urban Hash	DUH.png		843		6:30 PM						7:31 PM	Wednesday, March 11, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+13	Grapevine Quarterly Hash	GQhash.png		1		7:00 PM						7:33 PM	Friday, March 13, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+14	Dallas Hash	dallas.png		1220		2:00 PM			$10.00 - Pay Online: Paypal $10			7:39 PM	Saturday, March 21, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+18	Dallas Urban Hash	DUH.png		844		6:30 PM						7:37 PM	Wednesday, March 18, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+21	Ft Worth Hash	ftworth.png		1054		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:34 PM	Saturday, March 14, 2026		11/13/25 15:03 (TannedPeaches) 1.28
+25	Dallas Urban Hash	DUH.png		845		6:30 PM						7:42 PM	Wednesday, March 25, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+28	Ft Worth Hash	ftworth.png	Toga Hash	1055		2:00 PM	Son of a peach		$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:44 PM	Saturday, March 28, 2026		11/13/25 15:03 (TannedPeaches) 1.28

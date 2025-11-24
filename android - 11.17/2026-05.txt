@@ -1,0 +1,13 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+2	Dallas Hash	dallas.png		1223		2:00 PM			$10.00 - Pay Online: Paypal $10			8:09 PM	Saturday, May 02, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+3	YAKH3	YAKH3.png		S.9 | E.2		12:00 PM						8:10 PM	Sunday, May 03, 2026		11/17/25 8:02 (YakMan) 1.28
+6	Dallas Urban Hash	DUH.png		851		6:30 PM						8:12 PM	Wednesday, May 06, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+9	Ft Worth Hash	ftworth.png		1058		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:14 PM	Saturday, May 09, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+13	Dallas Urban Hash	DUH.png		852		6:30 PM						8:17 PM	Wednesday, May 13, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+16	Dallas Hash	dallas.png		1224		2:00 PM			$10.00 - Pay Online: Paypal $10			8:19 PM	Saturday, May 16, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+17	YAKH3	YAKH3.png		S.9 | E.3		12:00 PM						8:20 PM	Sunday, May 17, 2026		11/17/25 8:02 (YakMan) 1.28
+20	Dallas Urban Hash	DUH.png		853		6:30 PM						8:22 PM	Wednesday, May 20, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+23	Ft Worth Hash	ftworth.png	Ftwh3 & Kiss My H3 Combine Spring Tubing Camp out. (Memorial Weekend)	1059	Ftwh3/Kiss My H3	2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:24 PM	Saturday, May 23, 2026		11/13/25 16:06 (TannedPeaches) 1.28
+27	Dallas Urban Hash	DUH.png		854		6:30 PM						8:27 PM	Wednesday, May 27, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+30	Dallas Hash	dallas.png		1225		2:00 PM			$10.00 - Pay Online: Paypal $10			8:28 PM	Saturday, May 30, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+31	YAKH3	YAKH3.png		S.9 | E.4		12:00 PM						8:29 PM	Sunday, May 31, 2026		11/17/25 8:02 (YakMan) 1.28

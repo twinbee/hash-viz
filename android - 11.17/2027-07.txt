@@ -1,0 +1,16 @@
+day	kennel	icon	title	run	hares	time	start	map	hashcash	turds	tweet	twilight	date	desc	update
+3	Ft Worth Hash	ftworth.png		1088		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:39 PM	Saturday, July 03, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+5	NO-NO-DUH	nonoduh.png		23		7:00 PM			$7.00			8:39 PM	Monday, July 05, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+7	Dallas Urban Hash	DUH.png		911		6:30 PM						8:39 PM	Wednesday, July 07, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+9	YakH3-HH	YAKH3-HH.png		2		7:00 PM						8:38 PM	Friday, July 09, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+10	Dallas Hash	dallas.png		1254		2:00 PM			$10.00 - Pay Online: Paypal $10			8:38 PM	Saturday, July 10, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+11	YAKH3	YAKH3.png		7		12:00 PM						8:38 PM	Sunday, July 11, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+11	7-ELEVEn hash house harriers	7-ELEVEn.png		711		7:00 PM			$7.11			8:38 PM	Sunday, July 11, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+14	Dallas Urban Hash	DUH.png		912		6:30 PM						8:37 PM	Wednesday, July 14, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+17	Ft Worth Hash	ftworth.png		1089		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:36 PM	Saturday, July 17, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+18	Full Moon Hash	Calendar Icons-07.png		105		varies						8:35 PM	Sunday, July 18, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+21	Dallas Urban Hash	DUH.png		913		6:30 PM						8:34 PM	Wednesday, July 21, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+24	Dallas Hash	dallas.png		1255		2:00 PM			$10.00 - Pay Online: Paypal $10			8:32 PM	Saturday, July 24, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+25	YAKH3	YAKH3.png		8		12:00 PM						8:32 PM	Sunday, July 25, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+28	Dallas Urban Hash	DUH.png		914		6:30 PM						8:30 PM	Wednesday, July 28, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+31	Ft Worth Hash	ftworth.png		1090		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			8:27 PM	Saturday, July 31, 2027		(calgen 1.7) 11/14/2025 14:46 UTC

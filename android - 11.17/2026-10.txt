@@ -1,0 +1,10 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+3	Dallas Hash	dallas.png		1234		2:00 PM			$10.00 - Pay Online: Paypal $10			7:11 PM	Saturday, October 03, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+7	Dallas Urban Hash	DUH.png		873		6:30 PM						7:06 PM	Wednesday, October 07, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+10	Ft Worth Hash	ftworth.png	Red Dress Run (Charity)	1069		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:02 PM	Saturday, October 10, 2026		11/13/25 15:12 (TannedPeaches) 1.28
+14	Dallas Urban Hash	DUH.png		874		6:30 PM						6:57 PM	Wednesday, October 14, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+17	Dallas Hash	dallas.png		1235		2:00 PM			$10.00 - Pay Online: Paypal $10			6:53 PM	Saturday, October 17, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+21	Dallas Urban Hash	DUH.png		875		6:30 PM						6:49 PM	Wednesday, October 21, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+24	Ft Worth Hash	ftworth.png		1070		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			6:45 PM	Saturday, October 24, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+28	Dallas Urban Hash	DUH.png		876		6:30 PM						6:41 PM	Wednesday, October 28, 2026		(calgen 1.7) 11/13/2025 13:46 UTC
+31	Dallas Hash	dallas.png		1236		2:00 PM			$10.00 - Pay Online: Paypal $10			6:38 PM	Saturday, October 31, 2026		(calgen 1.7) 11/13/2025 13:46 UTC

@@ -1,0 +1,16 @@
+day	kennel	icon	title	run	hares	time	start	map	hashcash	turds	tweet	twilight	date	desc	update
+1	Dallas Urban Hash	DUH.png		919		6:30 PM						7:53 PM	Wednesday, September 01, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+3	YakH3-HH	YAKH3-HH.png		4		7:00 PM						7:51 PM	Friday, September 03, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+4	Dallas Hash	dallas.png		1258		2:00 PM			$10.00 - Pay Online: Paypal $10			7:50 PM	Saturday, September 04, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+5	YAKH3	YAKH3.png		11		12:00 PM						7:48 PM	Sunday, September 05, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+8	Dallas Urban Hash	DUH.png		920		6:30 PM						7:44 PM	Wednesday, September 08, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+11	Ft Worth Hash	ftworth.png		1093		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:40 PM	Saturday, September 11, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+13	Grapevine Quarterly Hash	GQhash.png		3		7:00 PM						7:38 PM	Monday, September 13, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+15	Dallas Urban Hash	DUH.png		921		6:30 PM						7:35 PM	Wednesday, September 15, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+15	Full Moon Hash	Calendar Icons-09.png		107		varies						7:35 PM	Wednesday, September 15, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+18	Dallas Hash	dallas.png		1259		2:00 PM			$10.00 - Pay Online: Paypal $10			7:31 PM	Saturday, September 18, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+19	YAKH3	YAKH3.png		12		12:00 PM						7:30 PM	Sunday, September 19, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+22	Dallas Urban Hash	DUH.png		922		6:30 PM						7:26 PM	Wednesday, September 22, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+25	Ft Worth Hash	ftworth.png		1094		2:00 PM			$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer			7:21 PM	Saturday, September 25, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+27	NO-NO-DUH	nonoduh.png		26		7:00 PM			$7.00			7:19 PM	Monday, September 27, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
+29	Dallas Urban Hash	DUH.png		923		6:30 PM						7:16 PM	Wednesday, September 29, 2027		(calgen 1.7) 11/14/2025 14:46 UTC
