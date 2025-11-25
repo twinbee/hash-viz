@@ -211,7 +211,13 @@ function createBackup($filename) {
 			$messageType = "error";
 		}
 		
-		// Read all lines
+		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+		if (get_magic_quotes_gpc()) {
+			$_POST = array_map('stripslashes', $_POST);
+		}
+		
+		// RELOAD the file to get the latest version before writing
+		// This prevents overwriting changes made by other users
 		$lines = file($filename, FILE_IGNORE_NEW_LINES);
 		$newLines = array();
 		$n = 0;
@@ -325,6 +331,11 @@ function createBackup($filename) {
 		}
 	}
 	fclose($file);
+	
+	// Strip slashes from data if magic_quotes_gpc is enabled
+	if (get_magic_quotes_gpc()) {
+		$data = array_map('stripslashes', $data);
+	}
 	
 	//DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
 	//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
