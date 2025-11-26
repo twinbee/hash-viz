@@ -255,13 +255,74 @@ function createBackup($filename) {
 				$desc = str_replace("\n", "<br />", $desc);
 				$desc = str_replace("\r", "<br />", $desc);
 				
+				// Remove any existing weather forecast block
+				$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
+				
+				// Add weather forecast to end of description
+				// Extract location from address (Start address field) for weather
 				$address = $_POST['address'];
+				
 				$address = str_replace("<br />", "\n", $address);
 				$address = str_replace("<br/>", "\n", $address);
 				$address = str_replace("<br>", "\n", $address);
+				
+				// Try to parse address for city/ZIP
+				$weatherLocation = ''; 
+				$weatherZip = '';
+				
+				// Try to find ZIP code (5 digits) - look for it anywhere in the address
+				if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
+					$weatherZip = $matches[1];
+					$weatherLocation = $weatherZip;
+				}
+				// If no ZIP, try to find city, state pattern (City, TX or City TX)
+				else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
+					$cityName = trim($matches[1]);
+					// Clean up city name - remove any leading/trailing non-letter characters
+					$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
+					$cityName = trim($cityName);
+					if (!empty($cityName)) {
+						$weatherLocation = $cityName . ', TX';
+					}
+				}
+				
+				// Default to Addison if no location found
+				if (empty($weatherLocation)) {
+					$weatherZip = '75001';
+					$weatherLocation = 'Addison, TX';
+				}
+				
+				// Default to Addison if no location found
+				if (empty($weatherLocation)) {
+					$weatherZip = '75001';
+					$weatherLocation = 'Addison, TX';
+				}
+				
+				// Use NWS forecast.weather.gov
+				// Their search endpoint: https://forecast.weather.gov/zipcity.php?inputstring=75023
+				$weatherQuery = $weatherLocation;
+				$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherQuery);
+				
+				// Build edit link
+				$editLink = sprintf(
+					'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d">edit</a>',
+					$year, $month, $day, $year, $no
+				);
+				
+				$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
+				$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
+				$weatherWidget .= '<br />' . $editLink;
+				$weatherWidget .= '<!-- WEATHER_END -->';
+				
+				$desc .= $weatherWidget;
+				
+				// Convert address line breaks
 				$address = str_replace("\r\n", "<br />", $address);
 				$address = str_replace("\n", "<br />", $address);
 				$address = str_replace("\r", "<br />", $address);
+				
+				// Build edit link for the Update field (same link)
+				$updateEditLink = '<br />' . $editLink;
 				
 				// Build updated line from POST data
 				$updatedData = array(
@@ -280,7 +341,7 @@ function createBackup($filename) {
 					'',
 					$_POST['date'],
 					$desc,
-					date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')'
+					date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $updateEditLink
 				);
 				$updatedLine = implode("\t", $updatedData);
 				$newLines[] = $updatedLine;
@@ -435,11 +496,14 @@ function createBackup($filename) {
 				<label>Description:</label>
 				<textarea name="desc" rows="10"><?php 
 					$desc = $data[14];
+					// Remove weather forecast block before editing
+					$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
 					$desc = str_replace("<br />", "\n", $desc);
 					$desc = str_replace("<br/>", "\n", $desc);
 					$desc = str_replace("<br>", "\n", $desc);
 					echo htmlspecialchars($desc); 
 				?></textarea>
+				<small style="color: #666;">Weather forecast will be automatically added at the end based on the address.</small>
 			</div>
 			
 			<div class="form-group">
