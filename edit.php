@@ -191,21 +191,233 @@ function generateDateString($day, $month, $year) {
 }
 
 // ============================================
+// HELPER FUNCTION: Get available icon files
+// ============================================
+function getIconFiles($year) {
+	$icons = array();
+	$iconDir = dirname(__FILE__); // Current directory (calendar/YYYY/)
+	
+	// Image extensions to look for
+	$extensions = array('png', 'jpg', 'jpeg', 'gif', 'webp', 'svg');
+	
+	foreach ($extensions as $ext) {
+		$pattern = $iconDir . '/*.' . $ext;
+		$files = glob($pattern);
+		if ($files) {
+			foreach ($files as $file) {
+				$icons[] = basename($file);
+			}
+		}
+		// Also check uppercase extensions
+		$pattern = $iconDir . '/*.' . strtoupper($ext);
+		$files = glob($pattern);
+		if ($files) {
+			foreach ($files as $file) {
+				$icons[] = basename($file);
+			}
+		}
+	}
+	
+	// Remove duplicates and sort
+	$icons = array_unique($icons);
+	sort($icons);
+	
+	return $icons;
+}
+
+// ============================================
+// HELPER FUNCTION: Calculate twilight time (approximate)
+// ============================================
+function getTwilightTime($day, $month, $year) {
+	// Simple approximation for DFW area
+	// This could be replaced with more accurate calculation
+	$timestamp = mktime(12, 0, 0, $month, $day, $year);
+	$dayOfYear = date('z', $timestamp);
+	
+	// Approximate sunset times for DFW (varies ~5:20 PM to 8:40 PM)
+	// Winter solstice (~Dec 21) = earliest ~5:20 PM
+	// Summer solstice (~Jun 21) = latest ~8:40 PM
+	$minMinutes = 17 * 60 + 20; // 5:20 PM in minutes
+	$maxMinutes = 20 * 60 + 40; // 8:40 PM in minutes
+	
+	// Calculate based on day of year (0 = Jan 1, ~172 = Jun 21, ~355 = Dec 21)
+	$angle = ($dayOfYear - 172) * (2 * 3.14159 / 365);
+	$twilightMinutes = $minMinutes + ($maxMinutes - $minMinutes) * (1 + cos($angle)) / 2;
+	
+	$hours = floor($twilightMinutes / 60);
+	$minutes = round($twilightMinutes % 60);
+	
+	return sprintf('%d:%02d PM', $hours - 12, $minutes);
+}
+
+// ============================================
 // MAIN SCRIPT
 // ============================================
 
-$year = $_GET["year"];
-$month = $_GET["month"];
-$day = $_GET["day"];
-$no = $_GET["no"];
+$year = isset($_GET["year"]) ? intval($_GET["year"]) : date('Y');
+$month = isset($_GET["month"]) ? intval($_GET["month"]) : date('n');
+$day = isset($_GET["day"]) ? intval($_GET["day"]) : date('j');
+$no = isset($_GET["no"]) ? intval($_GET["no"]) : 0;
+
+// Check if this is a new event (no=0 or action=new)
+$isNewEvent = ($no == 0 || (isset($_GET['action']) && $_GET['action'] == 'new'));
 
 $message = "";
 $messageType = "";
 $backupCreated = "";
-$redirectToEvent = false;
 
-// Handle form submission
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
+// Get available icons for dropdown
+$availableIcons = getIconFiles($year);
+
+// Handle form submission for NEW event
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent) {
+	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	
+	// Create backup before editing
+	if (file_exists($filename)) {
+		$backupFile = createBackup($filename);
+		if ($backupFile) {
+			$backupCreated = "Backup created: " . basename($backupFile);
+		}
+	}
+	
+	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+	if (get_magic_quotes_gpc()) {
+		$_POST = array_map('stripslashes', $_POST);
+	}
+	
+	// Get the day from POST (user can select it for new events)
+	$day = intval($_POST['day']);
+	
+	// Build description
+	$desc = $_POST['desc'];
+	$desc = str_replace("\r\n", "<br />", $desc);
+	$desc = str_replace("\n", "<br />", $desc);
+	$desc = str_replace("\r", "<br />", $desc);
+	
+	// Get address for weather lookup
+	$address = $_POST['address'];
+	$weatherLocation = '';
+	
+	if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
+		$weatherLocation = $matches[1];
+	} else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
+		$cityName = trim($matches[1]);
+		$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
+		$cityName = trim($cityName);
+		if (!empty($cityName)) {
+			$weatherLocation = $cityName . ', TX';
+		}
+	}
+	
+	if (empty($weatherLocation)) {
+		$weatherLocation = 'Addison, TX';
+	}
+	
+	$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherLocation);
+	
+	// Build edit link (will need to determine the event number after insertion)
+	$editLink = sprintf(
+		'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%%d">edit</a>',
+		$year, $month, $day, $year
+	);
+	
+	$calendarLink = sprintf(
+		'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%%d">add to calendar</a>',
+		$year, $month, $day, $year
+	);
+	
+	$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
+	$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
+	$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
+	$weatherWidget .= '<!-- WEATHER_END -->';
+	
+	$desc .= $weatherWidget;
+	
+	// Convert address line breaks
+	$address = str_replace("\r\n", "<br />", $address);
+	$address = str_replace("\n", "<br />", $address);
+	$address = str_replace("\r", "<br />", $address);
+	
+	// Auto-generate the date string
+	$autoDate = generateDateString($day, $month, $year);
+	
+	// Get twilight time
+	$twilight = getTwilightTime($day, $month, $year);
+	
+	// Build new event line
+	$newEventData = array(
+		$day,
+		$_POST['kennel'],
+		$_POST['type'],
+		$_POST['title'],
+		$_POST['run'],
+		$_POST['hares'],
+		$_POST['time'],
+		$address,
+		$_POST['maplink'],
+		$_POST['hashcash'],
+		$_POST['turds'],
+		'', // tweet
+		$twilight, // twilight
+		$autoDate,
+		$desc,
+		date('n/j/y G:i') . ' (created by ' . $_SESSION['username'] . ')'
+	);
+	$newEventLine = implode("\t", $newEventData);
+	
+	// Read existing file or create new one
+	$lines = array();
+	$header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE";
+	
+	if (file_exists($filename)) {
+		$lines = file($filename, FILE_IGNORE_NEW_LINES);
+	} else {
+		$lines[] = $header;
+	}
+	
+	// Find the right position to insert (sorted by day)
+	$insertIndex = 1; // After header
+	$eventNumber = 1;
+	
+	for ($i = 1; $i < count($lines); $i++) {
+		$lineData = explode("\t", $lines[$i]);
+		$lineDay = isset($lineData[0]) ? intval($lineData[0]) : 0;
+		
+		if ($lineDay < $day) {
+			$insertIndex = $i + 1;
+		} else if ($lineDay == $day) {
+			$insertIndex = $i + 1;
+			$eventNumber++;
+		} else {
+			break;
+		}
+	}
+	
+	// Update edit links with correct event number
+	$newEventLine = str_replace('no=%d', 'no=' . $eventNumber, $newEventLine);
+	
+	// Insert the new line
+	array_splice($lines, $insertIndex, 0, $newEventLine);
+	
+	// Write back to file
+	$result = file_put_contents($filename, implode("\n", $lines));
+	if ($result !== false) {
+		// Redirect to event.php
+		$eventUrl = sprintf(
+			'event.php?year=%d&month=%d&day=%d&no=%d',
+			$year, $month, $day, $eventNumber
+		);
+		header('Location: ' . $eventUrl);
+		exit;
+	} else {
+		$message = "Error: Unable to write to file. Check file permissions.";
+		$messageType = "error";
+	}
+}
+
+// Handle form submission for EDITING existing event
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
 	// Create backup before editing
@@ -223,12 +435,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 	}
 	
 	// RELOAD the file to get the latest version before writing
-	// This prevents overwriting changes made by other users
 	$lines = file($filename, FILE_IGNORE_NEW_LINES);
 	$newLines = array();
 	$n = 0;
 	$lastDay = "";
-	$lineIndex = 0;
 	$targetLineIndex = -1;
 	
 	// Find the target line
@@ -253,7 +463,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 			
 			// Build description with weather widget
 			$desc = $_POST['desc'];
-			// Convert newlines to <br /> for HTML
 			$desc = str_replace("\r\n", "<br />", $desc);
 			$desc = str_replace("\n", "<br />", $desc);
 			$desc = str_replace("\r", "<br />", $desc);
@@ -262,14 +471,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 			$address = $_POST['address'];
 			$weatherLocation = '';
 			
-			// Try to find ZIP code (5 digits)
 			if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
 				$weatherLocation = $matches[1];
-			}
-			// If no ZIP, try to find city, state pattern
-			else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
+			} else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
 				$cityName = trim($matches[1]);
-				// Clean up city name - remove any leading/trailing non-letter characters
 				$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
 				$cityName = trim($cityName);
 				if (!empty($cityName)) {
@@ -277,24 +482,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 				}
 			}
 			
-			// Default to Addison if no location found
 			if (empty($weatherLocation)) {
-				$weatherZip = '75001';
 				$weatherLocation = 'Addison, TX';
 			}
 			
-			// Use NWS forecast.weather.gov
-			// Their search endpoint: https://forecast.weather.gov/zipcity.php?inputstring=75023
-			$weatherQuery = $weatherLocation;
-			$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherQuery);
+			$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherLocation);
 			
-			// Build edit link
 			$editLink = sprintf(
 				'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d">edit</a>',
 				$year, $month, $day, $year, $no
 			);
 			
-			// Build calendar invite link
 			$calendarLink = sprintf(
 				'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d">add to calendar</a>',
 				$year, $month, $day, $year, $no
@@ -307,18 +505,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 			
 			$desc .= $weatherWidget;
 			
-			// Convert address line breaks
 			$address = str_replace("\r\n", "<br />", $address);
 			$address = str_replace("\n", "<br />", $address);
 			$address = str_replace("\r", "<br />", $address);
 			
-			// Build edit link for the Update field (same link)
-			$updateEditLink = '<br />' . $editLink;
-			
-			// Auto-generate the date string from day/month/year
 			$autoDate = generateDateString($day, $month, $year);
 			
-			// Build updated line from POST data
 			$updatedData = array(
 				$day,
 				$_POST['kennel'],
@@ -335,7 +527,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 				'',
 				$autoDate,
 				$desc,
-				date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $editLink
+				date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . '<br />' . $editLink
 			);
 			$updatedLine = implode("\t", $updatedData);
 			$newLines[] = $updatedLine;
@@ -348,7 +540,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 	if ($targetLineIndex >= 0) {
 		$result = file_put_contents($filename, implode("\n", $newLines));
 		if ($result !== false) {
-			// Redirect to event.php on successful save
 			$eventUrl = sprintf(
 				'event.php?year=%d&month=%d&day=%d&no=%d',
 				$year, $month, $day, $no
@@ -362,49 +553,57 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
 	}
 }
 
-// Load current event data
-$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-$file = fopen($filename, "r");
-if (!$file) {
-	echo "<p>Unable to open file.</p>";
-	exit;
-}
+// Load current event data (for editing existing events)
+$data = array('', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '');
 
-$n = 0;
-$lastDay = "";
-$data = array();
-
-while ($line = fgets($file, 8192)) {
-	$tempData = explode("\t", $line);
-	$d = isset($tempData[0]) ? $tempData[0] : '';
-	
-	if ($d != $lastDay) {
-		$n = 1;
-	} else {
-		$n += 1;
+if (!$isNewEvent) {
+	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	$file = fopen($filename, "r");
+	if (!$file) {
+		echo "<p>Unable to open file.</p>";
+		exit;
 	}
-	$lastDay = $d;
 	
-	if ($d == $day && $n == $no) {
-		$data = $tempData;
-		break;
+	$n = 0;
+	$lastDay = "";
+	
+	while ($line = fgets($file, 8192)) {
+		$tempData = explode("\t", $line);
+		$d = isset($tempData[0]) ? $tempData[0] : '';
+		
+		if ($d != $lastDay) {
+			$n = 1;
+		} else {
+			$n += 1;
+		}
+		$lastDay = $d;
+		
+		if ($d == $day && $n == $no) {
+			$data = $tempData;
+			break;
+		}
 	}
-}
-fclose($file);
-
-// Strip slashes from data if magic_quotes_gpc is enabled
-if (get_magic_quotes_gpc()) {
-	$data = array_map('stripslashes', $data);
+	fclose($file);
+	
+	// Strip slashes from data if magic_quotes_gpc is enabled
+	if (get_magic_quotes_gpc()) {
+		$data = array_map('stripslashes', $data);
+	}
 }
 
 //DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
 //MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
 
 $kennel = isset($data[1]) ? $data[1] : '';
-$dateDisplay = isset($data[13]) ? $data[13] : generateDateString($day, $month, $year);
-
-// Determine current TURDs value for dropdown
+$dateDisplay = isset($data[13]) && strlen($data[13]) > 0 ? $data[13] : generateDateString($day, $month, $year);
+$currentIcon = isset($data[2]) ? trim($data[2]) : '';
 $currentTurds = isset($data[10]) ? trim($data[10]) : '';
+
+// Get days in the selected month (for new event day selector)
+$daysInMonth = date('t', mktime(0, 0, 0, $month, 1, $year));
+
+$pageTitle = $isNewEvent ? "Add New Event" : "Edit Event";
+$formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 ?>
 <!DOCTYPE html>
 <html>
@@ -439,6 +638,7 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 		.btn-save { background: #4CAF50; color: white; border: none; }
 		.btn-cancel { background: #f44336; color: white; border: none; }
 		.btn-logout { background: #666; color: white; border: none; float: right; }
+		.btn-new { background: #2196F3; color: white; border: none; }
 		.success { color: green; padding: 10px; background: #d4edda; margin-bottom: 15px; border-radius: 3px; }
 		.error { color: red; padding: 10px; background: #f8d7da; margin-bottom: 15px; border-radius: 3px; }
 		.info { color: blue; padding: 10px; background: #d1ecf1; margin-bottom: 15px; border-radius: 3px; }
@@ -448,22 +648,61 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 		.nav-links { margin-bottom: 15px; }
 		.nav-links a { color: #0066cc; text-decoration: none; margin-right: 15px; }
 		.nav-links a:hover { text-decoration: underline; }
+		.icon-preview { 
+			display: inline-block; 
+			vertical-align: middle; 
+			margin-left: 10px;
+			max-height: 30px;
+		}
+		.date-selectors { display: flex; gap: 10px; }
+		.date-selectors select { width: auto; flex: 1; }
+		.new-event-banner {
+			background: #e3f2fd;
+			border: 1px solid #2196F3;
+			color: #1565c0;
+			padding: 10px;
+			border-radius: 3px;
+			margin-bottom: 15px;
+		}
 	</style>
+	
+	<script>
+	function updateIconPreview() {
+		var select = document.getElementById('iconSelect');
+		var preview = document.getElementById('iconPreview');
+		if (select.value) {
+			preview.src = select.value;
+			preview.style.display = 'inline-block';
+		} else {
+			preview.style.display = 'none';
+		}
+	}
+	</script>
 
-	<title>Edit <?php echo htmlspecialchars($kennel); ?> for <?php echo $month; ?>/<?php echo $day; ?>/<?php echo $year; ?></title>
+	<title><?php echo $pageTitle; ?> - <?php echo $month; ?>/<?php echo $day; ?>/<?php echo $year; ?></title>
 </head>
 <body>
 	<div id="container" class="edit-form">
 		<div class="nav-links">
 			<a href="/calendar">&laquo; Back to Calendar</a>
+			<?php if (!$isNewEvent): ?>
+			| <a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&action=new">➕ Add New Event</a>
+			<?php endif; ?>
 		</div>
 		
 		<div class="header">
 			<div class="user-info">Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong></div>
-			<h1 style="clear: both;">Edit Event</h1>
+			<h1 style="clear: both;"><?php echo $formTitle; ?></h1>
 			<a href="?logout=1" class="btn btn-logout">Logout</a>
 		</div>
+		
+		<?php if ($isNewEvent): ?>
+		<div class="new-event-banner">
+			📅 Creating a new event for <strong><?php echo date('F Y', mktime(0, 0, 0, $month, 1, $year)); ?></strong>
+		</div>
+		<?php else: ?>
 		<h2><?php echo htmlspecialchars($dateDisplay); ?></h2>
+		<?php endif; ?>
 		
 		<?php if ($message): ?>
 			<div class="<?php echo $messageType; ?>">
@@ -481,14 +720,51 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 		<?php endif; ?>
 		
 		<form method="POST" action="">
+			<?php if ($isNewEvent): ?>
+			<div class="form-group">
+				<label>Date:</label>
+				<div class="date-selectors">
+					<select name="month" id="monthSelect">
+						<?php for ($m = 1; $m <= 12; $m++): ?>
+						<option value="<?php echo $m; ?>" <?php echo ($m == $month) ? 'selected' : ''; ?>>
+							<?php echo date('F', mktime(0, 0, 0, $m, 1, $year)); ?>
+						</option>
+						<?php endfor; ?>
+					</select>
+					<select name="day" id="daySelect">
+						<?php for ($d = 1; $d <= $daysInMonth; $d++): ?>
+						<option value="<?php echo $d; ?>" <?php echo ($d == $day) ? 'selected' : ''; ?>>
+							<?php echo $d; ?>
+						</option>
+						<?php endfor; ?>
+					</select>
+					<select name="year" id="yearSelect" disabled>
+						<option value="<?php echo $year; ?>"><?php echo $year; ?></option>
+					</select>
+				</div>
+				<small style="color: #666;">Note: Year is determined by the calendar folder.</small>
+			</div>
+			<?php endif; ?>
+			
 			<div class="form-group">
 				<label>Kennel:</label>
 				<input type="text" name="kennel" value="<?php echo htmlspecialchars($data[1]); ?>" required>
 			</div>
 			
 			<div class="form-group">
-				<label>Type/Icon:</label>
-				<input type="text" name="type" value="<?php echo htmlspecialchars($data[2]); ?>">
+				<label>Icon:</label>
+				<select name="type" id="iconSelect" onchange="updateIconPreview()">
+					<option value="">-- Select Icon --</option>
+					<?php foreach ($availableIcons as $icon): ?>
+					<option value="<?php echo htmlspecialchars($icon); ?>" <?php echo ($currentIcon == $icon) ? 'selected' : ''; ?>>
+						<?php echo htmlspecialchars($icon); ?>
+					</option>
+					<?php endforeach; ?>
+				</select>
+				<img id="iconPreview" class="icon-preview" src="<?php echo htmlspecialchars($currentIcon); ?>" style="<?php echo empty($currentIcon) ? 'display:none;' : ''; ?>">
+				<?php if (empty($availableIcons)): ?>
+				<small style="color: #999;">No icon files found in calendar/<?php echo $year; ?>/ folder.</small>
+				<?php endif; ?>
 			</div>
 			
 			<div class="form-group">
@@ -508,13 +784,13 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 			
 			<div class="form-group">
 				<label>Time:</label>
-				<input type="text" name="time" value="<?php echo htmlspecialchars($data[6]); ?>">
+				<input type="text" name="time" value="<?php echo htmlspecialchars(isset($data[6]) ? $data[6] : '7:00 PM'); ?>">
 			</div>
 			
 			<div class="form-group">
 				<label>Address:</label>
 				<textarea name="address"><?php 
-					$addr = $data[7];
+					$addr = isset($data[7]) ? $data[7] : '';
 					$addr = str_replace("<br />", "\n", $addr);
 					$addr = str_replace("<br/>", "\n", $addr);
 					$addr = str_replace("<br>", "\n", $addr);
@@ -524,12 +800,12 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 			
 			<div class="form-group">
 				<label>Map Link:</label>
-				<input type="text" name="maplink" value="<?php echo htmlspecialchars($data[8]); ?>">
+				<input type="text" name="maplink" value="<?php echo htmlspecialchars(isset($data[8]) ? $data[8] : ''); ?>">
 			</div>
 			
 			<div class="form-group">
 				<label>Hash Cash:</label>
-				<input type="text" name="hashcash" value="<?php echo htmlspecialchars($data[9]); ?>">
+				<input type="text" name="hashcash" value="<?php echo htmlspecialchars(isset($data[9]) ? $data[9] : ''); ?>">
 			</div>
 			
 			<div class="form-group">
@@ -545,24 +821,29 @@ $currentTurds = isset($data[10]) ? trim($data[10]) : '';
 			<div class="form-group">
 				<label>Description:</label>
 				<textarea name="desc" rows="10"><?php 
-					$desc = $data[14];
-					// Remove old weather forecast blocks if they exist (cleanup from old version)
+					$desc = isset($data[14]) ? $data[14] : '';
 					$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
 					$desc = str_replace("<br />", "\n", $desc);
 					$desc = str_replace("<br/>", "\n", $desc);
 					$desc = str_replace("<br>", "\n", $desc);
 					echo htmlspecialchars($desc); 
 				?></textarea>
-				<small style="color: #666;">Note: Weather forecast, edit link, and calendar invite are added automatically by event.php</small>
+				<small style="color: #666;">Note: Weather forecast, edit link, and calendar invite are added automatically.</small>
 			</div>
 			
 			<div class="form-group">
-				<button type="submit" name="save" class="btn btn-save">💾 Save Changes</button>
+				<button type="submit" name="save" class="btn btn-save">💾 <?php echo $isNewEvent ? 'Create Event' : 'Save Changes'; ?></button>
+				<?php if ($isNewEvent): ?>
+				<a href="/calendar" class="btn btn-cancel">❌ Cancel</a>
+				<?php else: ?>
 				<a href="event.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>" class="btn btn-cancel">❌ Cancel</a>
+				<?php endif; ?>
 			</div>
 		</form>
 		
+		<?php if (!$isNewEvent): ?>
 		<p><small>Last updated: <?php echo isset($data[15]) ? htmlspecialchars($data[15]) : 'N/A'; ?></small></p>
+		<?php endif; ?>
 	</div>
 </body>
 </html>
