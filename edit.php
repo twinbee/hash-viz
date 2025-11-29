@@ -75,8 +75,8 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 		<style>
 			body { font-family: Arial, sans-serif; background: #f5f5f5; }
 			.login-container { 
-				max-width: 400px; 
-				margin: 100px auto; 
+				max-width: 500px; 
+				margin: 50px auto; 
 				padding: 30px; 
 				background: white; 
 				border-radius: 5px; 
@@ -98,6 +98,34 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 			.btn-login:hover { background: #45a049; }
 			.error { color: red; padding: 10px; background: #f8d7da; margin-bottom: 15px; border-radius: 3px; }
 			.info { color: blue; padding: 10px; background: #d1ecf1; margin-bottom: 15px; border-radius: 3px; }
+			.instructions-box {
+				margin-top: 25px;
+				padding: 15px;
+				background: #f8f9fa;
+				border: 1px solid #ddd;
+				border-radius: 5px;
+				font-size: 14px;
+			}
+			.instructions-box h3 {
+				margin-top: 0;
+				color: #333;
+			}
+			.instructions-box ol {
+				margin: 0;
+				padding-left: 20px;
+			}
+			.instructions-box li {
+				margin-bottom: 10px;
+			}
+			.instructions-box a {
+				color: #0066cc;
+			}
+			.instructions-box .note {
+				font-size: 12px;
+				color: #666;
+				font-style: italic;
+				margin-top: 10px;
+			}
 		</style>
 	</head>
 	<body>
@@ -120,6 +148,17 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 				</div>
 				<button type="submit" name="login" class="btn-login">Login</button>
 			</form>
+			
+			<div class="instructions-box">
+				<h3>📋 How to Get an Account</h3>
+				<ol>
+					<li>Request an account from <a href="mailto:likesitinthekitchen@gmail.com">likesitinthekitchen@gmail.com</a>. Include your hasher name and the kennel you represent.</li>
+					<li>Visit <a href="http://dfwhhh.org/calendar/password.php" target="_blank">http://dfwhhh.org/calendar/password.php</a> to generate your password hash. Copy the black background hash and send it to Kitchen.</li>
+					<li>Once your account is created, you can use the "Edit" links on each event page to make changes.</li>
+				</ol>
+				<p class="note"><strong>Note:</strong> Kitchen and other admins will not know your password or be able to recover it. Passwords are not stored anywhere, so save it for yourself. If you forget it, just generate a new password!</p>
+				<p class="note"><strong>Account Policy:</strong> Accounts are audited and added/removed on a yearly basis after elections, and on request of the associated kennel mis-management. Each calendar year maintains its own list of editors.</p>
+			</div>
 		</div>
 	</body>
 	</html>
@@ -144,8 +183,228 @@ function createBackup($filename) {
 }
 
 // ============================================
+// HELPER FUNCTION: Generate date string from day/month/year
+// ============================================
+function generateDateString($day, $month, $year) {
+	$timestamp = mktime(0, 0, 0, $month, $day, $year);
+	return date('l, F d, Y', $timestamp);
+}
+
+// ============================================
 // MAIN SCRIPT
 // ============================================
+
+$year = $_GET["year"];
+$month = $_GET["month"];
+$day = $_GET["day"];
+$no = $_GET["no"];
+
+$message = "";
+$messageType = "";
+$backupCreated = "";
+$redirectToEvent = false;
+
+// Handle form submission
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
+	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	
+	// Create backup before editing
+	$backupFile = createBackup($filename);
+	if ($backupFile) {
+		$backupCreated = "Backup created: " . basename($backupFile);
+	} else {
+		$message = "Warning: Could not create backup file.";
+		$messageType = "error";
+	}
+	
+	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+	if (get_magic_quotes_gpc()) {
+		$_POST = array_map('stripslashes', $_POST);
+	}
+	
+	// RELOAD the file to get the latest version before writing
+	// This prevents overwriting changes made by other users
+	$lines = file($filename, FILE_IGNORE_NEW_LINES);
+	$newLines = array();
+	$n = 0;
+	$lastDay = "";
+	$lineIndex = 0;
+	$targetLineIndex = -1;
+	
+	// Find the target line
+	foreach ($lines as $index => $line) {
+		if ($index == 0) {
+			$newLines[] = $line; // Keep header
+			continue;
+		}
+		
+		$data = explode("\t", $line);
+		$d = isset($data[0]) ? $data[0] : '';
+		
+		if ($d != $lastDay) {
+			$n = 1;
+		} else {
+			$n += 1;
+		}
+		$lastDay = $d;
+		
+		if ($d == $day && $n == $no) {
+			$targetLineIndex = $index;
+			
+			// Build description with weather widget
+			$desc = $_POST['desc'];
+			// Convert newlines to <br /> for HTML
+			$desc = str_replace("\r\n", "<br />", $desc);
+			$desc = str_replace("\n", "<br />", $desc);
+			$desc = str_replace("\r", "<br />", $desc);
+			
+			// Get address for weather lookup
+			$address = $_POST['address'];
+			$weatherLocation = '';
+			
+			// Try to find ZIP code (5 digits)
+			if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
+				$weatherLocation = $matches[1];
+			}
+			// If no ZIP, try to find city, state pattern
+			else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
+				$cityName = trim($matches[1]);
+				// Clean up city name - remove any leading/trailing non-letter characters
+				$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
+				$cityName = trim($cityName);
+				if (!empty($cityName)) {
+					$weatherLocation = $cityName . ', TX';
+				}
+			}
+			
+			// Default to Addison if no location found
+			if (empty($weatherLocation)) {
+				$weatherZip = '75001';
+				$weatherLocation = 'Addison, TX';
+			}
+			
+			// Use NWS forecast.weather.gov
+			// Their search endpoint: https://forecast.weather.gov/zipcity.php?inputstring=75023
+			$weatherQuery = $weatherLocation;
+			$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherQuery);
+			
+			// Build edit link
+			$editLink = sprintf(
+				'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d">edit</a>',
+				$year, $month, $day, $year, $no
+			);
+			
+			// Build calendar invite link
+			$calendarLink = sprintf(
+				'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d">add to calendar</a>',
+				$year, $month, $day, $year, $no
+			);
+			
+			$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
+			$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
+			$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
+			$weatherWidget .= '<!-- WEATHER_END -->';
+			
+			$desc .= $weatherWidget;
+			
+			// Convert address line breaks
+			$address = str_replace("\r\n", "<br />", $address);
+			$address = str_replace("\n", "<br />", $address);
+			$address = str_replace("\r", "<br />", $address);
+			
+			// Build edit link for the Update field (same link)
+			$updateEditLink = '<br />' . $editLink;
+			
+			// Auto-generate the date string from day/month/year
+			$autoDate = generateDateString($day, $month, $year);
+			
+			// Build updated line from POST data
+			$updatedData = array(
+				$day,
+				$_POST['kennel'],
+				$_POST['type'],
+				$_POST['title'],
+				$_POST['run'],
+				$_POST['hares'],
+				$_POST['time'],
+				$address,
+				$_POST['maplink'],
+				$_POST['hashcash'],
+				$_POST['turds'],
+				'',
+				'',
+				$autoDate,
+				$desc,
+				date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $editLink
+			);
+			$updatedLine = implode("\t", $updatedData);
+			$newLines[] = $updatedLine;
+		} else {
+			$newLines[] = $line;
+		}
+	}
+	
+	// Write back to file
+	if ($targetLineIndex >= 0) {
+		$result = file_put_contents($filename, implode("\n", $newLines));
+		if ($result !== false) {
+			// Redirect to event.php on successful save
+			$eventUrl = sprintf(
+				'event.php?year=%d&month=%d&day=%d&no=%d',
+				$year, $month, $day, $no
+			);
+			header('Location: ' . $eventUrl);
+			exit;
+		} else {
+			$message = "Error: Unable to write to file. Check file permissions.";
+			$messageType = "error";
+		}
+	}
+}
+
+// Load current event data
+$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+$file = fopen($filename, "r");
+if (!$file) {
+	echo "<p>Unable to open file.</p>";
+	exit;
+}
+
+$n = 0;
+$lastDay = "";
+$data = array();
+
+while ($line = fgets($file, 8192)) {
+	$tempData = explode("\t", $line);
+	$d = isset($tempData[0]) ? $tempData[0] : '';
+	
+	if ($d != $lastDay) {
+		$n = 1;
+	} else {
+		$n += 1;
+	}
+	$lastDay = $d;
+	
+	if ($d == $day && $n == $no) {
+		$data = $tempData;
+		break;
+	}
+}
+fclose($file);
+
+// Strip slashes from data if magic_quotes_gpc is enabled
+if (get_magic_quotes_gpc()) {
+	$data = array_map('stripslashes', $data);
+}
+
+//DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
+//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
+
+$kennel = isset($data[1]) ? $data[1] : '';
+$dateDisplay = isset($data[13]) ? $data[13] : generateDateString($day, $month, $year);
+
+// Determine current TURDs value for dropdown
+$currentTurds = isset($data[10]) ? trim($data[10]) : '';
 ?>
 <!DOCTYPE html>
 <html>
@@ -186,234 +445,19 @@ function createBackup($filename) {
 		.header { overflow: auto; margin-bottom: 20px; }
 		.backup-info { font-size: 12px; color: #666; margin-top: 5px; }
 		.user-info { float: left; color: #666; font-size: 14px; margin-top: 10px; }
+		.nav-links { margin-bottom: 15px; }
+		.nav-links a { color: #0066cc; text-decoration: none; margin-right: 15px; }
+		.nav-links a:hover { text-decoration: underline; }
 	</style>
 
-<?php
-	$year = $_GET["year"];
-	$month = $_GET["month"];
-	$day = $_GET["day"];
-	$no = $_GET["no"];
-	
-	$message = "";
-	$messageType = "";
-	$backupCreated = "";
-	
-	// Handle form submission
-	if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save'])) {
-		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-		
-		// Create backup before editing
-		$backupFile = createBackup($filename);
-		if ($backupFile) {
-			$backupCreated = "Backup created: " . basename($backupFile);
-		} else {
-			$message = "Warning: Could not create backup file.";
-			$messageType = "error";
-		}
-		
-		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
-		if (get_magic_quotes_gpc()) {
-			$_POST = array_map('stripslashes', $_POST);
-		}
-		
-		// RELOAD the file to get the latest version before writing
-		// This prevents overwriting changes made by other users
-		$lines = file($filename, FILE_IGNORE_NEW_LINES);
-		$newLines = array();
-		$n = 0;
-		$lastDay = "";
-		$lineIndex = 0;
-		$targetLineIndex = -1;
-		
-		// Find the target line
-		foreach ($lines as $index => $line) {
-			if ($index == 0) {
-				$newLines[] = $line; // Keep header
-				continue;
-			}
-			
-			$data = explode("\t", $line);
-			$d = isset($data[0]) ? $data[0] : '';
-			
-			if ($d != $lastDay) {
-				$n = 1;
-			} else {
-				$n += 1;
-			}
-			$lastDay = $d;
-			
-			if ($d == $day && $n == $no) {
-				$targetLineIndex = $index;
-				
-				// Convert line endings to <br /> for description and address fields
-				// Also convert existing <br> or <br/> tags to <br />
-				$desc = $_POST['desc'];
-				$desc = str_replace("<br />", "\n", $desc);
-				$desc = str_replace("<br/>", "\n", $desc);
-				$desc = str_replace("<br>", "\n", $desc);
-				$desc = str_replace("\r\n", "<br />", $desc);
-				$desc = str_replace("\n", "<br />", $desc);
-				$desc = str_replace("\r", "<br />", $desc);
-				
-				// Remove any existing weather forecast block
-				$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
-				
-				// Add weather forecast to end of description
-				// Extract location from address (Start address field) for weather
-				$address = $_POST['address'];
-				
-				$address = str_replace("<br />", "\n", $address);
-				$address = str_replace("<br/>", "\n", $address);
-				$address = str_replace("<br>", "\n", $address);
-				
-				// Try to parse address for city/ZIP
-				$weatherLocation = ''; 
-				$weatherZip = '';
-				
-				// Try to find ZIP code (5 digits) - look for it anywhere in the address
-				if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
-					$weatherZip = $matches[1];
-					$weatherLocation = $weatherZip;
-				}
-				// If no ZIP, try to find city, state pattern (City, TX or City TX)
-				else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
-					$cityName = trim($matches[1]);
-					// Clean up city name - remove any leading/trailing non-letter characters
-					$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
-					$cityName = trim($cityName);
-					if (!empty($cityName)) {
-						$weatherLocation = $cityName . ', TX';
-					}
-				}
-				
-				// Default to Addison if no location found
-				if (empty($weatherLocation)) {
-					$weatherZip = '75001';
-					$weatherLocation = 'Addison, TX';
-				}
-				
-				// Default to Addison if no location found
-				if (empty($weatherLocation)) {
-					$weatherZip = '75001';
-					$weatherLocation = 'Addison, TX';
-				}
-				
-				// Use NWS forecast.weather.gov
-				// Their search endpoint: https://forecast.weather.gov/zipcity.php?inputstring=75023
-				$weatherQuery = $weatherLocation;
-				$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherQuery);
-				
-				// Build edit link
-				$editLink = sprintf(
-					'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d">edit</a>',
-					$year, $month, $day, $year, $no
-				);
-				
-				// Build calendar invite link
-				$calendarLink = sprintf(
-					'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d">add to calendar</a>',
-					$year, $month, $day, $year, $no
-				);
-				
-				$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
-				$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
-				$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
-				$weatherWidget .= '<!-- WEATHER_END -->';
-				
-				$desc .= $weatherWidget;
-				
-				// Convert address line breaks
-				$address = str_replace("\r\n", "<br />", $address);
-				$address = str_replace("\n", "<br />", $address);
-				$address = str_replace("\r", "<br />", $address);
-				
-				// Build edit link for the Update field (same link)
-				$updateEditLink = '<br />' . $editLink;
-				
-				// Build updated line from POST data
-				$updatedData = array(
-					$day,
-					$_POST['kennel'],
-					$_POST['type'],
-					$_POST['title'],
-					$_POST['run'],
-					$_POST['hares'],
-					$_POST['time'],
-					$address,
-					$_POST['maplink'],
-					$_POST['hashcash'],
-					$_POST['turds'],
-					'',
-					'',
-					$_POST['date'],
-					$desc,
-					date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $editLink
-				);
-				$updatedLine = implode("\t", $updatedData);
-				$newLines[] = $updatedLine;
-			} else {
-				$newLines[] = $line;
-			}
-		}
-		
-		// Write back to file
-		if ($targetLineIndex >= 0) {
-			$result = file_put_contents($filename, implode("\n", $newLines));
-			if ($result !== false) {
-				$message = "✓ Event updated successfully!";
-				$messageType = "success";
-			} else {
-				$message = "Error: Unable to write to file. Check file permissions.";
-				$messageType = "error";
-			}
-		}
-	}
-	
-	// Load current event data
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-	$file = fopen($filename, "r");
-	if (!$file) {
-		echo "<p>Unable to open file.</p>";
-		exit;
-	}
-	
-	$n = 0;
-	$lastDay = "";
-	$data = array();
-	
-	while ($line = fgets($file, 8192)) {
-		$tempData = explode("\t", $line);
-		$d = isset($tempData[0]) ? $tempData[0] : '';
-		
-		if ($d != $lastDay) {
-			$n = 1;
-		} else {
-			$n += 1;
-		}
-		$lastDay = $d;
-		
-		if ($d == $day && $n == $no) {
-			$data = $tempData;
-			break;
-		}
-	}
-	fclose($file);
-	
-	// Strip slashes from data if magic_quotes_gpc is enabled
-	if (get_magic_quotes_gpc()) {
-		$data = array_map('stripslashes', $data);
-	}
-	
-	//DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
-	//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
-	
-	$kennel = isset($data[1]) ? $data[1] : '';
-	$dateDisplay = isset($data[13]) ? $data[13] : '';
-	printf("<title>Edit %s for %s/%s/%s</title>\n", htmlspecialchars($kennel), $month, $day, $year);
-?>
+	<title>Edit <?php echo htmlspecialchars($kennel); ?> for <?php echo $month; ?>/<?php echo $day; ?>/<?php echo $year; ?></title>
 </head>
 <body>
 	<div id="container" class="edit-form">
+		<div class="nav-links">
+			<a href="/calendar">&laquo; Back to Calendar</a>
+		</div>
+		
 		<div class="header">
 			<div class="user-info">Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong></div>
 			<h1 style="clear: both;">Edit Event</h1>
@@ -489,13 +533,13 @@ function createBackup($filename) {
 			</div>
 			
 			<div class="form-group">
-				<label>TURDs:</label>
-				<input type="text" name="turds" value="<?php echo htmlspecialchars($data[10]); ?>">
-			</div>
-			
-			<div class="form-group">
-				<label>Date:</label>
-				<input type="text" name="date" value="<?php echo htmlspecialchars($data[13]); ?>">
+				<label>TURDs? (Dogs):</label>
+				<select name="turds">
+					<option value="" <?php echo ($currentTurds == '') ? 'selected' : ''; ?>>-- Select --</option>
+					<option value="Yes" <?php echo ($currentTurds == 'Yes') ? 'selected' : ''; ?>>Yes</option>
+					<option value="No" <?php echo ($currentTurds == 'No') ? 'selected' : ''; ?>>No</option>
+					<option value="Trail-Only" <?php echo ($currentTurds == 'Trail-Only') ? 'selected' : ''; ?>>Trail-Only</option>
+				</select>
 			</div>
 			
 			<div class="form-group">
