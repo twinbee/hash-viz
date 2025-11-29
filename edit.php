@@ -251,6 +251,32 @@ function getTwilightTime($day, $month, $year) {
 }
 
 // ============================================
+// HELPER FUNCTION: Count events on a given day
+// ============================================
+function countEventsOnDay($filename, $targetDay) {
+	$count = 0;
+	if (!file_exists($filename)) {
+		return 0;
+	}
+	
+	$file = fopen($filename, "r");
+	if (!$file) {
+		return 0;
+	}
+	
+	while ($line = fgets($file, 8192)) {
+		$data = explode("\t", $line);
+		$d = isset($data[0]) ? $data[0] : '';
+		if ($d == $targetDay) {
+			$count++;
+		}
+	}
+	fclose($file);
+	
+	return $count;
+}
+
+// ============================================
 // MAIN SCRIPT
 // ============================================
 
@@ -269,7 +295,66 @@ $backupCreated = "";
 // Get available icons for dropdown
 $availableIcons = getIconFiles($year);
 
+// ============================================
+// Handle DELETE action
+// ============================================
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEvent) {
+	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	
+	// Create backup before deleting
+	$backupFile = createBackup($filename);
+	if ($backupFile) {
+		$backupCreated = "Backup created: " . basename($backupFile);
+	}
+	
+	// Read and process file
+	$lines = file($filename, FILE_IGNORE_NEW_LINES);
+	$newLines = array();
+	$n = 0;
+	$lastDay = "";
+	$deleted = false;
+	
+	foreach ($lines as $index => $line) {
+		if ($index == 0) {
+			$newLines[] = $line; // Keep header
+			continue;
+		}
+		
+		$data = explode("\t", $line);
+		$d = isset($data[0]) ? $data[0] : '';
+		
+		if ($d != $lastDay) {
+			$n = 1;
+		} else {
+			$n += 1;
+		}
+		$lastDay = $d;
+		
+		// Skip the line we want to delete
+		if ($d == $day && $n == $no) {
+			$deleted = true;
+			continue;
+		}
+		
+		$newLines[] = $line;
+	}
+	
+	if ($deleted) {
+		$result = file_put_contents($filename, implode("\n", $newLines));
+		if ($result !== false) {
+			// Redirect to calendar after delete
+			header('Location: /calendar');
+			exit;
+		} else {
+			$message = "Error: Unable to delete event. Check file permissions.";
+			$messageType = "error";
+		}
+	}
+}
+
+// ============================================
 // Handle form submission for NEW event
+// ============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
@@ -368,7 +453,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	
 	// Read existing file or create new one
 	$lines = array();
-	$header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDS\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE";
+	$header = "DAY\tKENNEL\tICON\tTITLE\tRUN\tHARES\tTIME\tSTART\tMAP\tHASHCASH\tTURDs\tTWEET\tTWILIGHT\tDATE\tDESC\tUPDATE";
 	
 	if (file_exists($filename)) {
 		$lines = file($filename, FILE_IGNORE_NEW_LINES);
@@ -416,7 +501,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	}
 }
 
+// ============================================
 // Handle form submission for EDITING existing event
+// ============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
@@ -555,9 +642,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 
 // Load current event data (for editing existing events)
 $data = array('', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '');
+$eventsOnThisDay = 0;
 
 if (!$isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	
+	// Count events on this day for prev/next navigation
+	$eventsOnThisDay = countEventsOnDay($filename, $day);
+	
 	$file = fopen($filename, "r");
 	if (!$file) {
 		echo "<p>Unable to open file.</p>";
@@ -604,6 +696,12 @@ $daysInMonth = date('t', mktime(0, 0, 0, $month, 1, $year));
 
 $pageTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
+
+// Calculate prev/next event numbers
+$hasPrev = (!$isNewEvent && $no > 1);
+$hasNext = (!$isNewEvent && $no < $eventsOnThisDay);
+$prevNo = $no - 1;
+$nextNo = $no + 1;
 ?>
 <!DOCTYPE html>
 <html>
@@ -639,6 +737,10 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 		.btn-cancel { background: #f44336; color: white; border: none; }
 		.btn-logout { background: #666; color: white; border: none; float: right; }
 		.btn-new { background: #2196F3; color: white; border: none; }
+		.btn-delete { background: #dc3545; color: white; border: none; }
+		.btn-nav { background: #6c757d; color: white; border: none; padding: 8px 15px; font-size: 14px; }
+		.btn-nav:hover { background: #5a6268; }
+		.btn-nav-disabled { background: #ccc; color: #666; cursor: not-allowed; }
 		.success { color: green; padding: 10px; background: #d4edda; margin-bottom: 15px; border-radius: 3px; }
 		.error { color: red; padding: 10px; background: #f8d7da; margin-bottom: 15px; border-radius: 3px; }
 		.info { color: blue; padding: 10px; background: #d1ecf1; margin-bottom: 15px; border-radius: 3px; }
@@ -664,6 +766,35 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 			border-radius: 3px;
 			margin-bottom: 15px;
 		}
+		.event-nav {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 15px;
+			padding: 10px;
+			background: #f8f9fa;
+			border-radius: 3px;
+		}
+		.event-nav-info {
+			font-size: 14px;
+			color: #666;
+		}
+		.action-buttons {
+			margin-top: 20px;
+			padding-top: 15px;
+			border-top: 1px solid #ddd;
+		}
+		.delete-section {
+			margin-top: 20px;
+			padding: 15px;
+			background: #fff3cd;
+			border: 1px solid #ffc107;
+			border-radius: 3px;
+		}
+		.delete-section h4 {
+			margin-top: 0;
+			color: #856404;
+		}
 	</style>
 	
 	<script>
@@ -677,6 +808,10 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 			preview.style.display = 'none';
 		}
 	}
+	
+	function confirmDelete() {
+		return confirm('Are you sure you want to delete this event?\n\nThis action cannot be undone (but a backup will be created).');
+	}
 	</script>
 
 	<title><?php echo $pageTitle; ?> - <?php echo $month; ?>/<?php echo $day; ?>/<?php echo $year; ?></title>
@@ -686,7 +821,7 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 		<div class="nav-links">
 			<a href="/calendar">&laquo; Back to Calendar</a>
 			<?php if (!$isNewEvent): ?>
-			| <a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&action=new">➕ Add New Event</a>
+			| <a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&action=new">➕ Add New Event on <?php echo $month; ?>/<?php echo $day; ?></a>
 			<?php endif; ?>
 		</div>
 		
@@ -702,6 +837,28 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 		</div>
 		<?php else: ?>
 		<h2><?php echo htmlspecialchars($dateDisplay); ?></h2>
+		
+		<?php if ($eventsOnThisDay > 1): ?>
+		<div class="event-nav">
+			<div>
+				<?php if ($hasPrev): ?>
+				<a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $prevNo; ?>" class="btn btn-nav">◀ Prev Event</a>
+				<?php else: ?>
+				<span class="btn btn-nav btn-nav-disabled">◀ Prev Event</span>
+				<?php endif; ?>
+			</div>
+			<div class="event-nav-info">
+				Event <?php echo $no; ?> of <?php echo $eventsOnThisDay; ?> on this day
+			</div>
+			<div>
+				<?php if ($hasNext): ?>
+				<a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $nextNo; ?>" class="btn btn-nav">Next Event ▶</a>
+				<?php else: ?>
+				<span class="btn btn-nav btn-nav-disabled">Next Event ▶</span>
+				<?php endif; ?>
+			</div>
+		</div>
+		<?php endif; ?>
 		<?php endif; ?>
 		
 		<?php if ($message): ?>
@@ -842,6 +999,18 @@ $formTitle = $isNewEvent ? "Add New Event" : "Edit Event";
 		</form>
 		
 		<?php if (!$isNewEvent): ?>
+		<div class="action-buttons">
+			<a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&action=new" class="btn btn-new">➕ Add New Event on This Day</a>
+		</div>
+		
+		<div class="delete-section">
+			<h4>⚠️ Danger Zone</h4>
+			<p>Permanently delete this event. A backup will be created before deletion.</p>
+			<form method="POST" action="" onsubmit="return confirmDelete();">
+				<button type="submit" name="delete" class="btn btn-delete">🗑️ Delete Event</button>
+			</form>
+		</div>
+		
 		<p><small>Last updated: <?php echo isset($data[15]) ? htmlspecialchars($data[15]) : 'N/A'; ?></small></p>
 		<?php endif; ?>
 	</div>
