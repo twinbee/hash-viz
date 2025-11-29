@@ -309,9 +309,15 @@ function createBackup($filename) {
 					$year, $month, $day, $year, $no
 				);
 				
+				// Build calendar invite link
+				$calendarLink = sprintf(
+					'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d">add to calendar</a>',
+					$year, $month, $day, $year, $no
+				);
+				
 				$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
 				$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
-				$weatherWidget .= '<br />' . $editLink;
+				$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
 				$weatherWidget .= '<!-- WEATHER_END -->';
 				
 				$desc .= $weatherWidget;
@@ -341,7 +347,7 @@ function createBackup($filename) {
 					'',
 					$_POST['date'],
 					$desc,
-					date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $updateEditLink
+					date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . $editLink
 				);
 				$updatedLine = implode("\t", $updatedData);
 				$newLines[] = $updatedLine;
@@ -496,14 +502,14 @@ function createBackup($filename) {
 				<label>Description:</label>
 				<textarea name="desc" rows="10"><?php 
 					$desc = $data[14];
-					// Remove weather forecast block before editing
+					// Remove old weather forecast blocks if they exist (cleanup from old version)
 					$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
 					$desc = str_replace("<br />", "\n", $desc);
 					$desc = str_replace("<br/>", "\n", $desc);
 					$desc = str_replace("<br>", "\n", $desc);
 					echo htmlspecialchars($desc); 
 				?></textarea>
-				<small style="color: #666;">Weather forecast will be automatically added at the end based on the address.</small>
+				<small style="color: #666;">Note: Weather forecast, edit link, and calendar invite are added automatically by event.php</small>
 			</div>
 			
 			<div class="form-group">
