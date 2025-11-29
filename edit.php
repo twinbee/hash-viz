@@ -170,8 +170,24 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 // BACKUP FUNCTION
 // ============================================
 function createBackup($filename) {
+	// Check if source file exists
+	if (!file_exists($filename)) {
+		error_log("Backup failed: Source file does not exist: " . $filename);
+		return false;
+	}
+	
+	// Create backup directory if needed
 	if (!file_exists(BACKUP_DIR)) {
-		mkdir(BACKUP_DIR, 0755, true);
+		if (!mkdir(BACKUP_DIR, 0755, true)) {
+			error_log("Backup failed: Could not create backup directory: " . BACKUP_DIR);
+			return false;
+		}
+	}
+	
+	// Check if backup directory is writable
+	if (!is_writable(BACKUP_DIR)) {
+		error_log("Backup failed: Backup directory is not writable: " . BACKUP_DIR);
+		return false;
 	}
 	
 	$backupFile = BACKUP_DIR . basename($filename) . '.' . date('Y-m-d_H-i-s') . '.bak';
@@ -179,6 +195,8 @@ function createBackup($filename) {
 	if (copy($filename, $backupFile)) {
 		return $backupFile;
 	}
+	
+	error_log("Backup failed: copy() failed from " . $filename . " to " . $backupFile);
 	return false;
 }
 
@@ -305,9 +323,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 	$backupFile = createBackup($filename);
 	if ($backupFile) {
 		$backupCreated = "Backup created: " . basename($backupFile);
+	} else {
+		$message = "Warning: Could not create backup file. Delete cancelled for safety.";
+		$messageType = "error";
 	}
 	
-	// Read and process file
+	// Only proceed with delete if backup was successful
+	if (!$backupFile) {
+		// Skip delete - backup failed
+	} else {
+		// Read and process file
 	$lines = file($filename, FILE_IGNORE_NEW_LINES);
 	$newLines = array();
 	$n = 0;
@@ -350,6 +375,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 			$messageType = "error";
 		}
 	}
+	} // end backup success check
 }
 
 // ============================================
@@ -358,11 +384,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
-	// Create backup before editing
+	// Create backup before editing (if file exists)
 	if (file_exists($filename)) {
 		$backupFile = createBackup($filename);
 		if ($backupFile) {
 			$backupCreated = "Backup created: " . basename($backupFile);
+		} else {
+			// For new events, we can proceed even if backup fails (file might not exist yet)
+			error_log("Warning: Could not create backup for new event, proceeding anyway");
 		}
 	}
 	
