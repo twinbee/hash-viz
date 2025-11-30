@@ -1,9 +1,16 @@
 <?php
 // ============================================
+// EDIT.PHP - Event Editor for DFW Hash House Harriers
+// Version 2.0
+// ============================================
+
+// ============================================
 // MULTI-USER AUTHENTICATION CONFIGURATION
 // ============================================
 // Multiple users with hashed passwords
 // Use password_hash_generator.php to generate new password hashes
+
+define('EDITPHP_VERSION', '2.0');
 
 // Array of users: username => md5_hash
 $USERS = array(
@@ -243,30 +250,8 @@ function getIconFiles($year) {
 	return $icons;
 }
 
-// ============================================
-// HELPER FUNCTION: Calculate twilight time (approximate)
-// ============================================
-function getTwilightTime($day, $month, $year) {
-	// Simple approximation for DFW area
-	// This could be replaced with more accurate calculation
-	$timestamp = mktime(12, 0, 0, $month, $day, $year);
-	$dayOfYear = date('z', $timestamp);
-	
-	// Approximate sunset times for DFW (varies ~5:20 PM to 8:40 PM)
-	// Winter solstice (~Dec 21) = earliest ~5:20 PM
-	// Summer solstice (~Jun 21) = latest ~8:40 PM
-	$minMinutes = 17 * 60 + 20; // 5:20 PM in minutes
-	$maxMinutes = 20 * 60 + 40; // 8:40 PM in minutes
-	
-	// Calculate based on day of year (0 = Jan 1, ~172 = Jun 21, ~355 = Dec 21)
-	$angle = ($dayOfYear - 172) * (2 * 3.14159 / 365);
-	$twilightMinutes = $minMinutes + ($maxMinutes - $minMinutes) * (1 + cos($angle)) / 2;
-	
-	$hours = floor($twilightMinutes / 60);
-	$minutes = round($twilightMinutes % 60);
-	
-	return sprintf('%d:%02d PM', $hours - 12, $minutes);
-}
+// Include twilight calculator
+require_once('twilight.php');
 
 // ============================================
 // HELPER FUNCTION: Count events on a given day
@@ -430,20 +415,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	
 	$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherLocation);
 	
-	// Build edit link (will need to determine the event number after insertion)
-	$editLink = sprintf(
-		'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%%d">edit</a>',
-		$year, $month, $day, $year
-	);
-	
-	$calendarLink = sprintf(
-		'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%%d">add to calendar</a>',
-		$year, $month, $day, $year
-	);
-	
 	$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
 	$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
-	$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
 	$weatherWidget .= '<!-- WEATHER_END -->';
 	
 	$desc .= $weatherWidget;
@@ -457,7 +430,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	$autoDate = generateDateString($day, $month, $year);
 	
 	// Get twilight time
-	$twilight = getTwilightTime($day, $month, $year);
+	$twilight = getTwilightEnd($day, $month, $year);
 	
 	// Build new event line
 	$newEventData = array(
@@ -476,7 +449,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		$twilight, // twilight
 		$autoDate,
 		$desc,
-		date('n/j/y G:i') . ' (created by ' . $_SESSION['username'] . ')'
+		date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION
 	);
 	$newEventLine = implode("\t", $newEventData);
 	
@@ -604,19 +577,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			
 			$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherLocation);
 			
-			$editLink = sprintf(
-				'<a href="http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d">edit</a>',
-				$year, $month, $day, $year, $no
-			);
-			
-			$calendarLink = sprintf(
-				'<a href="http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d">add to calendar</a>',
-				$year, $month, $day, $year, $no
-			);
-			
 			$weatherWidget = '<!-- WEATHER_START --><br /><br /><strong>Weather Forecast for ' . htmlspecialchars($weatherLocation) . ':</strong><br />';
 			$weatherWidget .= '<iframe src="' . $weatherUrl . '" width="100%" height="600" frameborder="0" scrolling="yes" style="border: 1px solid #ccc;"></iframe>';
-			$weatherWidget .= '<br />' . $editLink . ' | ' . $calendarLink;
 			$weatherWidget .= '<!-- WEATHER_END -->';
 			
 			$desc .= $weatherWidget;
@@ -643,7 +605,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 				'',
 				$autoDate,
 				$desc,
-				date('n/j/y G:i') . ' (edited by ' . $_SESSION['username'] . ')' . '<br />' . $editLink
+				date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION
 			);
 			$updatedLine = implode("\t", $updatedData);
 			$newLines[] = $updatedLine;
