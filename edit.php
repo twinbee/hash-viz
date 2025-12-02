@@ -18,7 +18,9 @@ $USERS = array(
 	'bdb' => '1828c25220d3606e0ef9b8b704f46a88',
 	'FruityPebbles' => 'b12cbb0934293c4ade0c4114b8b602da',
 	'MBennett' => 'b599f1365e1832f5e66c8e88f8fede78',
-	'Fourplay' => '4e6175b953b7488a33cafe71db52c3ae'
+	'Fourplay' => '4e6175b953b7488a33cafe71db52c3ae',
+	'doubledribble' => 'd884306a107cfc48ac34bbb3d0a61917', // 2025-12-01 13:04:57
+
 );
 
 define('BACKUP_DIR', '../../android/backups/');
@@ -388,11 +390,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	// Get the day from POST (user can select it for new events)
 	$day = intval($_POST['day']);
 	
+	// Build Trail Type line
+	$trailTypeLine = '';
+	if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
+		$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
+	}
+	
+	// Build Bring line from checkboxes
+	$bringLine = '';
+	if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
+		$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
+	}
+	
 	// Build description
 	$desc = $_POST['desc'];
 	$desc = str_replace("\r\n", "<br />", $desc);
 	$desc = str_replace("\n", "<br />", $desc);
 	$desc = str_replace("\r", "<br />", $desc);
+	
+	// Append Trail Type and Bring lines to description
+	$desc = $desc . $trailTypeLine . $bringLine;
 	
 	// Get address for weather lookup
 	$address = $_POST['address'];
@@ -550,11 +567,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 		if ($d == $day && $n == $no) {
 			$targetLineIndex = $index;
 			
+			// Build Trail Type line
+			$trailTypeLine = '';
+			if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
+				$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
+			}
+			
+			// Build Bring line from checkboxes
+			$bringLine = '';
+			if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
+				$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
+			}
+			
 			// Build description with weather widget
 			$desc = $_POST['desc'];
 			$desc = str_replace("\r\n", "<br />", $desc);
 			$desc = str_replace("\n", "<br />", $desc);
 			$desc = str_replace("\r", "<br />", $desc);
+			
+			// Append Trail Type and Bring lines to description
+			$desc = $desc . $trailTypeLine . $bringLine;
 			
 			// Get address for weather lookup
 			$address = $_POST['address'];
@@ -786,6 +818,25 @@ $nextNo = $no + 1;
 			margin-top: 0;
 			color: #856404;
 		}
+		.checkbox-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+			gap: 8px;
+			padding: 10px;
+			background: #f8f9fa;
+			border: 1px solid #ddd;
+			border-radius: 3px;
+		}
+		.checkbox-label {
+			display: flex;
+			align-items: center;
+			font-weight: normal;
+			cursor: pointer;
+		}
+		.checkbox-label input[type="checkbox"] {
+			width: auto;
+			margin-right: 6px;
+		}
 	</style>
 	
 	<script>
@@ -968,15 +1019,69 @@ $nextNo = $no + 1;
 			
 			<div class="form-group">
 				<label>Description:</label>
-				<textarea name="desc" rows="10"><?php 
+				<textarea name="desc" rows="10" placeholder="What do the hounds need to know about this trail?"><?php 
 					$desc = isset($data[14]) ? $data[14] : '';
 					$desc = preg_replace('/<!-- WEATHER_START -->.*?<!-- WEATHER_END -->/s', '', $desc);
+					// Remove existing Bring: line since it's now handled by checkboxes
+					$desc = preg_replace('/Bring:\s*[^\n<]+\s*/i', '', $desc);
+					// Remove existing Trail Type line since it's now handled by dropdown
+					$desc = preg_replace('/Trail Type:\s*(A to A\'?|A to B)\s*/i', '', $desc);
 					$desc = str_replace("<br />", "\n", $desc);
 					$desc = str_replace("<br/>", "\n", $desc);
 					$desc = str_replace("<br>", "\n", $desc);
+					$desc = trim($desc);
 					echo htmlspecialchars($desc); 
 				?></textarea>
 				<small style="color: #666;">Note: Weather forecast, edit link, and calendar invite are added automatically.</small>
+			</div>
+			
+			<div class="form-group">
+				<label>Trail Type:</label>
+				<?php
+				// Parse existing trail type from description
+				$currentTrailType = '';
+				$descText = isset($data[14]) ? $data[14] : '';
+				if (preg_match('/Trail Type:\s*(A to A\'?|A to B)/i', $descText, $trailMatch)) {
+					$currentTrailType = trim($trailMatch[1]);
+				}
+				?>
+				<select name="trailtype">
+					<option value="" <?php echo ($currentTrailType == '') ? 'selected' : ''; ?>>-- Select --</option>
+					<option value="A to A" <?php echo ($currentTrailType == 'A to A') ? 'selected' : ''; ?>>A to A</option>
+					<option value="A to A'" <?php echo ($currentTrailType == "A to A'") ? 'selected' : ''; ?>>A to A'</option>
+					<option value="A to B" <?php echo ($currentTrailType == 'A to B') ? 'selected' : ''; ?>>A to B</option>
+				</select>
+			</div>
+			
+			<div class="form-group">
+				<label>Bring:</label>
+				<div class="checkbox-grid">
+					<?php
+					$bringOptions = array(
+						'Flashlight', 'Extra Shoes', 'Extra Clothes', 'Anti-Shiggy',
+						'Glowsticks', 'Virgins', 'On-In $', 'Bug Spray',
+						'Swimsuit', 'Birthday Suit', 'DART', 'Pre-lube',
+						'Leash', 'Trash Bags', 'BYOB', 'BYOE',
+						'Vessel', 'Bowl/Spoon', 'Cash'
+					);
+					
+					// Parse existing bring items from description
+					$existingBring = array();
+					$descText = isset($data[14]) ? $data[14] : '';
+					if (preg_match('/Bring:\s*([^<\n]+)/i', $descText, $bringMatch)) {
+						$existingBring = array_map('trim', explode(',', $bringMatch[1]));
+					}
+					
+					foreach ($bringOptions as $option):
+						$checkboxId = 'bring_' . strtolower(str_replace(' ', '_', $option));
+						$isChecked = in_array($option, $existingBring) ? 'checked' : '';
+					?>
+					<label class="checkbox-label">
+						<input type="checkbox" name="bring[]" value="<?php echo htmlspecialchars($option); ?>" <?php echo $isChecked; ?>>
+						<?php echo htmlspecialchars($option); ?>
+					</label>
+					<?php endforeach; ?>
+				</div>
 			</div>
 			
 			<div class="form-group">

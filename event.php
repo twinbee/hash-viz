@@ -160,7 +160,7 @@
 		// Add action links
 		printf("\t\t<p style=\"margin-top: 15px;\">\n");
 		printf("\t\t\t<a href=\"%s\">edit</a> | \n", $editLink);
-		printf("\t\t\t<a href=\"%s\">add to calendar</a> | \n", $calendarLink);
+		printf("\t\t\t<a href=\"%s\">download calendar invite</a> | \n", $calendarLink);
 		printf("\t\t\t<a href=\"%s\">back to calendar</a>\n", $calendarMonthLink);
 		printf("\t\t</p>\n");
 		
