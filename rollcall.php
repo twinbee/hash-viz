@@ -1,12 +1,16 @@
 <?php
 // ============================================
 // ROLLCALL.PHP - Attendance Tracking for DFW Hash House Harriers
-// Version 1.1
+// Version 1.2
 // ============================================
 
 // Data directory for attendance records
 define('ROLLCALL_DIR', '../../android/rollcall/');
 define('HASHERS_FILE', 'hashers.txt');
+
+// Testing mode - bypasses time check
+// Usage: ?test=1 or ?test=onin
+$TESTING_MODE = (isset($_GET['test']) && ($_GET['test'] == '1' || $_GET['test'] == 'onin'));
 
 // ============================================
 // SECURITY: Sanitize hasher names
@@ -108,20 +112,24 @@ function isCheckinAllowed($year, $month, $day, $timeStr) {
 // ============================================
 // HELPER: Get checkin window info
 // ============================================
-function getCheckinWindowInfo($year, $month, $day, $timeStr) {
+function getCheckinWindowInfo($year, $month, $day, $timeStr, $testingMode = false) {
 	$eventTime = getEventTimestamp($year, $month, $day, $timeStr);
 	$now = time();
 	
 	$windowStart = $eventTime - (10 * 60);
 	$windowEnd = $eventTime + (4 * 60 * 60);
 	
+	// Testing mode forces window open
+	$isOpen = $testingMode || ($now >= $windowStart && $now <= $windowEnd);
+	
 	return array(
 		'eventTime' => $eventTime,
 		'windowStart' => $windowStart,
 		'windowEnd' => $windowEnd,
-		'isOpen' => ($now >= $windowStart && $now <= $windowEnd),
-		'isBefore' => ($now < $windowStart),
-		'isAfter' => ($now > $windowEnd)
+		'isOpen' => $isOpen,
+		'isBefore' => !$testingMode && ($now < $windowStart),
+		'isAfter' => !$testingMode && ($now > $windowEnd),
+		'testingMode' => $testingMode
 	);
 }
 
@@ -236,6 +244,7 @@ function getAttendanceFile($year, $month, $day, $no, $kennel) {
 
 // ============================================
 // HELPER: Load attendance for an event
+// Format: name \t timestamp \t payment_method
 // ============================================
 function loadAttendance($year, $month, $day, $no, $kennel) {
 	$file = getAttendanceFile($year, $month, $day, $no, $kennel);
@@ -248,7 +257,10 @@ function loadAttendance($year, $month, $day, $no, $kennel) {
 	foreach ($lines as $line) {
 		$parts = explode("\t", $line);
 		if (count($parts) >= 2) {
-			$attendance[$parts[0]] = $parts[1]; // name => timestamp
+			$attendance[$parts[0]] = array(
+				'timestamp' => $parts[1],
+				'payment' => isset($parts[2]) ? $parts[2] : ''
+			);
 		}
 	}
 	
@@ -267,8 +279,13 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 	$file = getAttendanceFile($year, $month, $day, $no, $kennel);
 	
 	$lines = array();
-	foreach ($attendance as $name => $timestamp) {
-		$lines[] = $name . "\t" . $timestamp;
+	foreach ($attendance as $name => $data) {
+		// Support both old format (string timestamp) and new format (array with timestamp and payment)
+		if (is_array($data)) {
+			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . (isset($data['payment']) ? $data['payment'] : '');
+		} else {
+			$lines[] = $name . "\t" . $data . "\t";
+		}
 	}
 	
 	file_put_contents($file, implode("\n", $lines), LOCK_EX);
@@ -365,8 +382,8 @@ $eventTitle = isset($eventData[3]) ? trim($eventData[3]) : '';
 $eventTime = isset($eventData[6]) ? trim($eventData[6]) : '6:00 PM';
 $eventDate = isset($eventData[13]) ? trim($eventData[13]) : '';
 
-// Get checkin window info
-$windowInfo = getCheckinWindowInfo($year, $month, $day, $eventTime);
+// Get checkin window info (pass testing mode)
+$windowInfo = getCheckinWindowInfo($year, $month, $day, $eventTime, $TESTING_MODE);
 
 // Load hashers and attendance
 $hashers = loadHashers();
@@ -384,6 +401,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	// Handle toggle checkin/checkout
 	if (isset($_POST['toggle'])) {
 		$hasherName = $_POST['toggle'];
+		$paymentMethod = isset($_POST['payment_' . md5($hasherName)]) ? $_POST['payment_' . md5($hasherName)] : '';
 		
 		if ($windowInfo['isOpen']) {
 			if (isset($attendance[$hasherName])) {
@@ -391,8 +409,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 				unset($attendance[$hasherName]);
 				$message = htmlspecialchars($hasherName) . " checked out.";
 			} else {
-				// Check in
-				$attendance[$hasherName] = date('Y-m-d H:i:s');
+				// Check in with payment method
+				$attendance[$hasherName] = array(
+					'timestamp' => date('Y-m-d H:i:s'),
+					'payment' => $paymentMethod
+				);
 				$message = htmlspecialchars($hasherName) . " checked in!";
 			}
 			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
@@ -402,9 +423,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 		}
 	}
 	
+	// Handle payment update for already checked-in hasher
+	if (isset($_POST['update_payment'])) {
+		$hasherName = $_POST['update_payment'];
+		$paymentMethod = isset($_POST['payment_' . md5($hasherName)]) ? $_POST['payment_' . md5($hasherName)] : '';
+		
+		if ($windowInfo['isOpen'] && isset($attendance[$hasherName])) {
+			$attendance[$hasherName]['payment'] = $paymentMethod;
+			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+			$message = "Payment method updated for " . htmlspecialchars($hasherName) . ".";
+		}
+	}
+	
 	// Handle add new hasher - initial request
 	if (isset($_POST['add_new']) && isset($_POST['new_hasher_name'])) {
 		$newHasherName = sanitizeHasherName($_POST['new_hasher_name']);
+		$newPaymentMethod = isset($_POST['new_payment']) ? $_POST['new_payment'] : '';
 		
 		if (empty($newHasherName)) {
 			$message = "Please enter a hash name.";
@@ -424,7 +458,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 				// No similar names, add directly
 				$hashers[] = $newHasherName;
 				saveHashers($hashers);
-				$attendance[$newHasherName] = date('Y-m-d H:i:s');
+				$attendance[$newHasherName] = array(
+					'timestamp' => date('Y-m-d H:i:s'),
+					'payment' => $newPaymentMethod
+				);
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 				$message = "Welcome! \"" . htmlspecialchars($newHasherName) . "\" has been added and checked in!";
 				$newHasherName = '';
@@ -437,11 +474,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	// Handle confirmed add new hasher
 	if (isset($_POST['confirm_add']) && isset($_POST['confirmed_name'])) {
 		$newHasherName = sanitizeHasherName($_POST['confirmed_name']);
+		$newPaymentMethod = isset($_POST['confirmed_payment']) ? $_POST['confirmed_payment'] : '';
 		
 		if (!empty($newHasherName) && $windowInfo['isOpen'] && !hasherExists($newHasherName, $hashers)) {
 			$hashers[] = $newHasherName;
 			saveHashers($hashers);
-			$attendance[$newHasherName] = date('Y-m-d H:i:s');
+			$attendance[$newHasherName] = array(
+				'timestamp' => date('Y-m-d H:i:s'),
+				'payment' => $newPaymentMethod
+			);
 			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 			$message = "Welcome! \"" . htmlspecialchars($newHasherName) . "\" has been added and checked in!";
 			$newHasherName = '';
@@ -457,6 +498,9 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 
 // Head count
 $headCount = count($attendance);
+
+// Payment method options
+$paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 ?>
 <!DOCTYPE html>
 <html>
@@ -677,6 +721,23 @@ $headCount = count($attendance);
 		.add-new-section button:hover {
 			background: #303f9f;
 		}
+		.payment-select {
+			padding: 5px 8px;
+			font-size: 12px;
+			border: 1px solid #ccc;
+			border-radius: 3px;
+			background: white;
+			margin-left: 10px;
+			min-width: 80px;
+		}
+		.payment-badge {
+			font-size: 10px;
+			padding: 2px 6px;
+			border-radius: 3px;
+			background: #e3f2fd;
+			color: #1565c0;
+			margin-left: 8px;
+		}
 		.rollcall {
 			background: white;
 			border: 1px solid #ddd;
@@ -761,14 +822,19 @@ $headCount = count($attendance);
 		<h3>📋 How to Check In</h3>
 		<ul>
 			<li>Find your hash name in the list below (use search to filter)</li>
-			<li>Tap the checkbox next to your name to check in</li>
+			<li>Select your payment method and tap the checkbox to check in</li>
 			<li>Check-in opens <strong>10 minutes before</strong> and closes <strong>4 hours after</strong> the event start time</li>
 			<li>Check in at the On-In so we know you made it back safely!</li>
 			<li>Your attendance counts toward your hash stats</li>
 		</ul>
 	</div>
 	
-	<?php if ($windowInfo['isOpen']): ?>
+	<?php if ($windowInfo['testingMode']): ?>
+	<div class="window-status window-open" style="background: #fff3e0; border-color: #ff9800; color: #e65100;">
+		🧪 TESTING MODE - CHECK-IN ALWAYS OPEN<br>
+		<small>Normal window: <?php echo date('g:i A', $windowInfo['windowStart']); ?> - <?php echo date('g:i A', $windowInfo['windowEnd']); ?></small>
+	</div>
+	<?php elseif ($windowInfo['isOpen']): ?>
 	<div class="window-status window-open">
 		✅ CHECK-IN IS OPEN<br>
 		<small>Until <?php echo date('g:i A', $windowInfo['windowEnd']); ?></small>
@@ -824,6 +890,11 @@ $headCount = count($attendance);
 		<div class="buttons">
 			<form method="POST" style="display: inline;">
 				<input type="hidden" name="confirmed_name" value="<?php echo htmlspecialchars($newHasherName); ?>">
+				<select name="confirmed_payment" class="payment-select" style="margin-right: 10px;">
+					<?php foreach ($paymentOptions as $opt): ?>
+					<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid How? --'; ?></option>
+					<?php endforeach; ?>
+				</select>
 				<button type="submit" name="confirm_add" class="btn-confirm">✅ Yes, Add New Name</button>
 			</form>
 			<form method="GET" style="display: inline;">
@@ -831,6 +902,7 @@ $headCount = count($attendance);
 				<input type="hidden" name="month" value="<?php echo $month; ?>">
 				<input type="hidden" name="day" value="<?php echo $day; ?>">
 				<input type="hidden" name="no" value="<?php echo $no; ?>">
+				<?php if ($TESTING_MODE): ?><input type="hidden" name="test" value="1"><?php endif; ?>
 				<button type="submit" class="btn-cancel">❌ Cancel</button>
 			</form>
 		</div>
@@ -850,13 +922,24 @@ $headCount = count($attendance);
 				$checkedNames = array_keys($attendance);
 				sort($checkedNames, SORT_STRING | SORT_FLAG_CASE);
 				foreach ($checkedNames as $hasher): 
+					$hasherData = $attendance[$hasher];
+					$timestamp = is_array($hasherData) ? $hasherData['timestamp'] : $hasherData;
+					$payment = is_array($hasherData) && isset($hasherData['payment']) ? $hasherData['payment'] : '';
 				?>
 				<form method="POST" style="margin:0;">
-					<div class="hasher-item checked-in" onclick="this.querySelector('button').click();">
-						<input type="checkbox" class="hasher-checkbox" checked readonly>
+					<div class="hasher-item checked-in">
+						<input type="checkbox" class="hasher-checkbox" checked onclick="this.form.querySelector('button[name=toggle]').click();">
 						<span class="hasher-name"><?php echo htmlspecialchars($hasher); ?></span>
-						<span class="hasher-time"><?php echo date('g:i A', strtotime($attendance[$hasher])); ?></span>
+						<select name="payment_<?php echo md5($hasher); ?>" class="payment-select" onchange="this.form.querySelector('button[name=update_payment]').click();">
+							<?php foreach ($paymentOptions as $opt): ?>
+							<option value="<?php echo htmlspecialchars($opt); ?>" <?php echo ($payment == $opt) ? 'selected' : ''; ?>>
+								<?php echo $opt ? htmlspecialchars($opt) : '-- Paid --'; ?>
+							</option>
+							<?php endforeach; ?>
+						</select>
+						<span class="hasher-time"><?php echo date('g:i A', strtotime($timestamp)); ?></span>
 						<button type="submit" name="toggle" value="<?php echo htmlspecialchars($hasher); ?>" style="display:none;"></button>
+						<button type="submit" name="update_payment" value="<?php echo htmlspecialchars($hasher); ?>" style="display:none;"></button>
 					</div>
 				</form>
 				<?php endforeach; ?>
@@ -868,12 +951,14 @@ $headCount = count($attendance);
 			<?php foreach ($hashers as $hasher): ?>
 			<?php if (isset($attendance[$hasher])) continue; // Skip already checked in ?>
 			<form method="POST" style="margin:0;" class="hasher-form">
-				<div class="hasher-item" data-name="<?php echo htmlspecialchars(strtolower($hasher)); ?>" onclick="this.querySelector('button').click();">
-					<input type="checkbox" class="hasher-checkbox" <?php echo isset($attendance[$hasher]) ? 'checked' : ''; ?>>
+				<div class="hasher-item" data-name="<?php echo htmlspecialchars(strtolower($hasher)); ?>">
+					<input type="checkbox" class="hasher-checkbox" onclick="this.form.querySelector('button').click();">
 					<span class="hasher-name"><?php echo htmlspecialchars($hasher); ?></span>
-					<?php if (isset($attendance[$hasher])): ?>
-					<span class="hasher-time"><?php echo date('g:i A', strtotime($attendance[$hasher])); ?></span>
-					<?php endif; ?>
+					<select name="payment_<?php echo md5($hasher); ?>" class="payment-select" onclick="event.stopPropagation();">
+						<?php foreach ($paymentOptions as $opt): ?>
+						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid --'; ?></option>
+						<?php endforeach; ?>
+					</select>
 					<button type="submit" name="toggle" value="<?php echo htmlspecialchars($hasher); ?>" style="display:none;"></button>
 				</div>
 			</form>
@@ -884,8 +969,15 @@ $headCount = count($attendance);
 		<div class="add-new-section">
 			<h4>➕ Not on the list? Add yourself:</h4>
 			<form method="POST">
-				<input type="text" name="new_hasher_name" placeholder="Enter your hash name..." value="<?php echo htmlspecialchars($newHasherName); ?>">
-				<button type="submit" name="add_new">Add & Check In</button>
+				<div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+					<input type="text" name="new_hasher_name" placeholder="Enter your hash name..." value="<?php echo htmlspecialchars($newHasherName); ?>" style="flex: 1; min-width: 200px;">
+					<select name="new_payment" class="payment-select" style="margin-left: 0;">
+						<?php foreach ($paymentOptions as $opt): ?>
+						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid How? --'; ?></option>
+						<?php endforeach; ?>
+					</select>
+					<button type="submit" name="add_new">Add & Check In</button>
+				</div>
 			</form>
 			<p style="margin-top: 10px; font-size: 12px; color: #666;">
 				New to hashing? Welcome! Enter your hash name (or "Just [YourName]" if you don't have one yet).

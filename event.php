@@ -163,9 +163,16 @@
 			$month, $day, $year, $no
 		);
 		
+		// Generate checkin link
+		$checkinLink = sprintf(
+			'checkin.php?month=%d&day=%d&year=%d&no=%d',
+			$month, $day, $year, $no
+		);
+		
 		// Add action links
 		printf("\t\t<p style=\"margin-top: 15px;\">\n");
 		printf("\t\t\t<a href=\"%s\">edit</a> | \n", $editLink);
+		printf("\t\t\t<a href=\"%s\">check in</a> | \n", $checkinLink);
 		printf("\t\t\t<a href=\"%s\">roll call</a> | \n", $rollcallLink);
 		printf("\t\t\t<a href=\"%s\">download calendar invite</a> | \n", $calendarLink);
 		printf("\t\t\t<a href=\"%s\">back to calendar</a>\n", $calendarMonthLink);
