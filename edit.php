@@ -7,21 +7,13 @@
 // ============================================
 // MULTI-USER AUTHENTICATION CONFIGURATION
 // ============================================
-// Multiple users with hashed passwords
-// Use password_hash_generator.php to generate new password hashes
+// Users are stored in a separate file to avoid overwriting during updates
+// Use password.php to generate new password hashes
 
 define('EDITPHP_VERSION', '2.0');
 
-// Array of users: username => md5_hash
-$USERS = array(
-	'kitchen' => 'fdf7c86c3904f5d41c7b22e38acfd84e',
-	'bdb' => '1828c25220d3606e0ef9b8b704f46a88',
-	'FruityPebbles' => 'b12cbb0934293c4ade0c4114b8b602da',
-	'MBennett' => 'b599f1365e1832f5e66c8e88f8fede78',
-	'Fourplay' => '4e6175b953b7488a33cafe71db52c3ae',
-	'doubledribble' => 'd884306a107cfc48ac34bbb3d0a61917', // 2025-12-01 13:04:57
-
-);
+// Load users from separate file
+require_once('users.php');
 
 define('BACKUP_DIR', '../../android/backups/');
 
@@ -178,7 +170,7 @@ if (!isset($_SESSION['authenticated']) || $_SESSION['authenticated'] !== true) {
 // ============================================
 // BACKUP FUNCTION
 // ============================================
-function createBackup($filename) {
+function createBackup($filename, $username = '', $eventInfo = '') {
 	// Check if source file exists
 	if (!file_exists($filename)) {
 		error_log("Backup failed: Source file does not exist: " . $filename);
@@ -202,6 +194,11 @@ function createBackup($filename) {
 	$backupFile = BACKUP_DIR . basename($filename) . '.' . date('Y-m-d_H-i-s') . '.bak';
 	
 	if (copy($filename, $backupFile)) {
+		// Log who made the change and what event
+		$logFile = BACKUP_DIR . 'changelog.log';
+		$logEntry = date('Y-m-d H:i:s') . "\t" . $username . "\t" . basename($filename) . "\t" . $eventInfo . "\n";
+		file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
+		
 		return $backupFile;
 	}
 	
@@ -282,6 +279,72 @@ function countEventsOnDay($filename, $targetDay) {
 }
 
 // ============================================
+// HELPER FUNCTION: Find prev/next events for same kennel
+// ============================================
+function findKennelEvents($filename, $currentDay, $currentNo, $currentKennel) {
+	$result = array('prev' => null, 'next' => null);
+	
+	if (!file_exists($filename)) {
+		return $result;
+	}
+	
+	$file = fopen($filename, "r");
+	if (!$file) {
+		return $result;
+	}
+	
+	$events = array();
+	$n = 0;
+	$lastDay = "";
+	$currentIndex = -1;
+	
+	// Read all events for this kennel
+	while ($line = fgets($file, 8192)) {
+		$data = explode("\t", $line);
+		$d = isset($data[0]) ? $data[0] : '';
+		$kennel = isset($data[1]) ? trim($data[1]) : '';
+		
+		if ($d != $lastDay) {
+			$n = 1;
+		} else {
+			$n += 1;
+		}
+		$lastDay = $d;
+		
+		// Only track events for the same kennel
+		if ($kennel == $currentKennel) {
+			$events[] = array('day' => $d, 'no' => $n);
+			
+			// Check if this is the current event
+			if ($d == $currentDay && $n == $currentNo) {
+				$currentIndex = count($events) - 1;
+			}
+		}
+	}
+	fclose($file);
+	
+	// Find prev and next
+	if ($currentIndex > 0) {
+		$result['prev'] = $events[$currentIndex - 1];
+	}
+	if ($currentIndex >= 0 && $currentIndex < count($events) - 1) {
+		$result['next'] = $events[$currentIndex + 1];
+	}
+	
+	return $result;
+}
+
+// ============================================
+// HELPER FUNCTION: Recursively strip slashes (for nested arrays like bring[])
+// ============================================
+function stripslashes_deep($value) {
+	if (is_array($value)) {
+		return array_map('stripslashes_deep', $value);
+	}
+	return stripslashes($value);
+}
+
+// ============================================
 // MAIN SCRIPT
 // ============================================
 
@@ -307,7 +370,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
 	// Create backup before deleting
-	$backupFile = createBackup($filename);
+	$eventInfo = "DELETE day=$day no=$no";
+	$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
 	if ($backupFile) {
 		$backupCreated = "Backup created: " . basename($backupFile);
 	} else {
@@ -371,9 +435,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
+	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+	if (get_magic_quotes_gpc()) {
+		$_POST = stripslashes_deep($_POST);
+	}
+	
+	// Get the day from POST (user can select it for new events)
+	$day = intval($_POST['day']);
+	
 	// Create backup before editing (if file exists)
 	if (file_exists($filename)) {
-		$backupFile = createBackup($filename);
+		$eventInfo = "NEW day=$day kennel=" . $_POST['kennel'];
+		$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
 		if ($backupFile) {
 			$backupCreated = "Backup created: " . basename($backupFile);
 		} else {
@@ -381,14 +454,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 			error_log("Warning: Could not create backup for new event, proceeding anyway");
 		}
 	}
-	
-	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
-	if (get_magic_quotes_gpc()) {
-		$_POST = array_map('stripslashes', $_POST);
-	}
-	
-	// Get the day from POST (user can select it for new events)
-	$day = intval($_POST['day']);
 	
 	// Build Trail Type line
 	$trailTypeLine = '';
@@ -526,18 +591,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEvent) {
 	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 	
+	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+	if (get_magic_quotes_gpc()) {
+		$_POST = stripslashes_deep($_POST);
+	}
+	
 	// Create backup before editing
-	$backupFile = createBackup($filename);
+	$eventInfo = "EDIT day=$day no=$no kennel=" . $_POST['kennel'];
+	$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
 	if ($backupFile) {
 		$backupCreated = "Backup created: " . basename($backupFile);
 	} else {
 		$message = "Warning: Could not create backup file.";
 		$messageType = "error";
-	}
-	
-	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
-	if (get_magic_quotes_gpc()) {
-		$_POST = array_map('stripslashes', $_POST);
 	}
 	
 	// RELOAD the file to get the latest version before writing
@@ -702,8 +768,11 @@ if (!$isNewEvent) {
 	
 	// Strip slashes from data if magic_quotes_gpc is enabled
 	if (get_magic_quotes_gpc()) {
-		$data = array_map('stripslashes', $data);
+		$data = stripslashes_deep($data);
 	}
+	
+	// Find prev/next events for the same kennel
+	$kennelEvents = findKennelEvents($filename, $day, $no, isset($data[1]) ? trim($data[1]) : '');
 }
 
 //DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
@@ -837,9 +906,26 @@ $nextNo = $no + 1;
 			width: auto;
 			margin-right: 6px;
 		}
+		.kennel-nav {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 15px;
+			padding: 10px;
+			background: #e8f4e8;
+			border: 1px solid #4CAF50;
+			border-radius: 3px;
+		}
+		.kennel-nav-info {
+			font-size: 14px;
+			color: #2e7d32;
+			font-weight: bold;
+		}
 	</style>
 	
 	<script>
+	var formChanged = false;
+	
 	function updateIconPreview() {
 		var select = document.getElementById('iconSelect');
 		var preview = document.getElementById('iconPreview');
@@ -854,6 +940,38 @@ $nextNo = $no + 1;
 	function confirmDelete() {
 		return confirm('Are you sure you want to delete this event?\n\nThis action cannot be undone (but a backup will be created).');
 	}
+	
+	// Track form changes
+	function markChanged() {
+		formChanged = true;
+	}
+	
+	// Warn before leaving if there are unsaved changes
+	window.onbeforeunload = function(e) {
+		if (formChanged) {
+			var message = 'You have unsaved changes. Are you sure you want to leave?';
+			e.returnValue = message;
+			return message;
+		}
+	};
+	
+	// Don't warn when submitting the form
+	function allowLeave() {
+		formChanged = false;
+		return true;
+	}
+	
+	// Attach change listeners after page loads
+	window.onload = function() {
+		var form = document.getElementById('editForm');
+		if (form) {
+			var inputs = form.querySelectorAll('input, textarea, select');
+			for (var i = 0; i < inputs.length; i++) {
+				inputs[i].addEventListener('change', markChanged);
+				inputs[i].addEventListener('keyup', markChanged);
+			}
+		}
+	};
 	</script>
 
 	<title><?php echo $pageTitle; ?> - <?php echo $month; ?>/<?php echo $day; ?>/<?php echo $year; ?></title>
@@ -901,6 +1019,28 @@ $nextNo = $no + 1;
 			</div>
 		</div>
 		<?php endif; ?>
+		
+		<?php if (isset($kennelEvents) && ($kennelEvents['prev'] || $kennelEvents['next'])): ?>
+		<div class="kennel-nav">
+			<div>
+				<?php if ($kennelEvents['prev']): ?>
+				<a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $kennelEvents['prev']['day']; ?>&no=<?php echo $kennelEvents['prev']['no']; ?>" class="btn btn-nav">◀ Prev <?php echo htmlspecialchars($kennel); ?></a>
+				<?php else: ?>
+				<span class="btn btn-nav btn-nav-disabled">◀ Prev <?php echo htmlspecialchars($kennel); ?></span>
+				<?php endif; ?>
+			</div>
+			<div class="kennel-nav-info">
+				<?php echo htmlspecialchars($kennel); ?> Events
+			</div>
+			<div>
+				<?php if ($kennelEvents['next']): ?>
+				<a href="edit.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $kennelEvents['next']['day']; ?>&no=<?php echo $kennelEvents['next']['no']; ?>" class="btn btn-nav">Next <?php echo htmlspecialchars($kennel); ?> ▶</a>
+				<?php else: ?>
+				<span class="btn btn-nav btn-nav-disabled">Next <?php echo htmlspecialchars($kennel); ?> ▶</span>
+				<?php endif; ?>
+			</div>
+		</div>
+		<?php endif; ?>
 		<?php endif; ?>
 		
 		<?php if ($message): ?>
@@ -918,7 +1058,7 @@ $nextNo = $no + 1;
 			</div>
 		<?php endif; ?>
 		
-		<form method="POST" action="">
+		<form method="POST" action="" id="editForm" onsubmit="return allowLeave();">
 			<?php if ($isNewEvent): ?>
 			<div class="form-group">
 				<label>Date:</label>
@@ -1058,11 +1198,11 @@ $nextNo = $no + 1;
 				<div class="checkbox-grid">
 					<?php
 					$bringOptions = array(
-						'Flashlight', 'Extra Shoes', 'Extra Clothes', 'Anti-Shiggy',
-						'Glowsticks', 'Virgins', 'On-In $', 'Bug Spray',
-						'Swimsuit', 'Birthday Suit', 'DART', 'Pre-lube',
+						'Flashlight', 'Extra Shoes', 'Rain Gear', 'Long Pants/Socks',
+						'Vessel', 'Bowl/Spork', 'Extra $', 'Bug Spray',
+						'Swimsuit', 'Birthday Suit', 'DART/Uber', 'Pre-lube',
 						'Leash', 'Trash Bags', 'BYOB', 'BYOE',
-						'Vessel', 'Bowl/Spoon', 'Cash'
+						
 					);
 					
 					// Parse existing bring items from description
@@ -1102,7 +1242,7 @@ $nextNo = $no + 1;
 		<div class="delete-section">
 			<h4>⚠️ Danger Zone</h4>
 			<p>Permanently delete this event. A backup will be created before deletion.</p>
-			<form method="POST" action="" onsubmit="return confirmDelete();">
+			<form method="POST" action="" onsubmit="formChanged = false; return confirmDelete();">
 				<button type="submit" name="delete" class="btn btn-delete">🗑️ Delete Event</button>
 			</form>
 		</div>
