@@ -1,12 +1,31 @@
 <?php
 // ============================================
 // ROLLCALL.PHP - Attendance Tracking for DFW Hash House Harriers
-// Version 1.0
+// Version 1.1
 // ============================================
 
 // Data directory for attendance records
 define('ROLLCALL_DIR', '../../android/rollcall/');
 define('HASHERS_FILE', 'hashers.txt');
+
+// ============================================
+// SECURITY: Sanitize hasher names
+// ============================================
+function sanitizeHasherName($name) {
+	// Remove null bytes
+	$name = str_replace(chr(0), '', $name);
+	// Remove script tags
+	$name = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $name);
+	// Remove javascript: protocol
+	$name = preg_replace('/javascript\s*:/i', '', $name);
+	// Remove on* event handlers
+	$name = preg_replace('/\bon\w+\s*=/i', '', $name);
+	// Remove angle brackets entirely for names (no HTML needed in names)
+	$name = preg_replace('/<[^>]*>/', '', $name);
+	// Trim
+	$name = trim($name);
+	return $name;
+}
 
 // ============================================
 // HELPER: Get event info from data file
@@ -385,7 +404,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	
 	// Handle add new hasher - initial request
 	if (isset($_POST['add_new']) && isset($_POST['new_hasher_name'])) {
-		$newHasherName = trim($_POST['new_hasher_name']);
+		$newHasherName = sanitizeHasherName($_POST['new_hasher_name']);
 		
 		if (empty($newHasherName)) {
 			$message = "Please enter a hash name.";
@@ -417,7 +436,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	
 	// Handle confirmed add new hasher
 	if (isset($_POST['confirm_add']) && isset($_POST['confirmed_name'])) {
-		$newHasherName = trim($_POST['confirmed_name']);
+		$newHasherName = sanitizeHasherName($_POST['confirmed_name']);
 		
 		if (!empty($newHasherName) && $windowInfo['isOpen'] && !hasherExists($newHasherName, $hashers)) {
 			$hashers[] = $newHasherName;

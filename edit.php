@@ -1,8 +1,12 @@
 <?php
 // ============================================
 // EDIT.PHP - Event Editor for DFW Hash House Harriers
-// Version 2.0
+// Version 2.1
 // ============================================
+
+// Enable error reporting for debugging (comment out in production)
+// error_reporting(E_ALL);
+// ini_set('display_errors', 1);
 
 // ============================================
 // MULTI-USER AUTHENTICATION CONFIGURATION
@@ -10,12 +14,132 @@
 // Users are stored in a separate file to avoid overwriting during updates
 // Use password.php to generate new password hashes
 
-define('EDITPHP_VERSION', '2.0');
+define('EDITPHP_VERSION', '2.1');
 
 // Load users from separate file
 require_once('users.php');
 
 define('BACKUP_DIR', '../../android/backups/');
+
+// ============================================
+// SECURITY FUNCTIONS
+// ============================================
+
+// Sanitize output for HTML context (full escape)
+function h($string) {
+	return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
+}
+
+// Sanitize HTML - allow safe tags, remove dangerous content like javascript
+function sanitizeHtml($input) {
+	if (is_array($input)) {
+		return array_map('sanitizeHtml', $input);
+	}
+	
+	// Remove null bytes
+	$input = str_replace(chr(0), '', $input);
+	
+	// Remove script tags and their contents
+	$input = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $input);
+	
+	// Remove javascript: protocol from any attribute
+	$input = preg_replace('/javascript\s*:/i', '', $input);
+	
+	// Remove vbscript: protocol
+	$input = preg_replace('/vbscript\s*:/i', '', $input);
+	
+	// Remove data: protocol (can be used for XSS)
+	$input = preg_replace('/data\s*:[^,]*base64/i', '', $input);
+	
+	// Remove on* event handlers (onclick, onerror, onload, etc.)
+	$input = preg_replace('/\bon\w+\s*=/i', '', $input);
+	
+	// Remove style attributes (can contain expressions in old IE)
+	$input = preg_replace('/\bstyle\s*=/i', '', $input);
+	
+	// Remove iframe, object, embed, form tags
+	$input = preg_replace('/<(iframe|object|embed|form|meta|link|base)\b[^>]*>/i', '', $input);
+	$input = preg_replace('/<\/(iframe|object|embed|form|meta|link|base)>/i', '', $input);
+	
+	// Remove expression() which was used for XSS in old IE
+	$input = preg_replace('/expression\s*\(/i', '', $input);
+	
+	// Allowed tags: a, img, b, i, u, strike, strong, em, br, p, span, div
+	// These are implicitly allowed by not removing them
+	
+	return $input;
+}
+
+// Sanitize input - remove null bytes and trim (for non-HTML fields)
+function sanitizeInput($input) {
+	if (is_array($input)) {
+		return array_map('sanitizeInput', $input);
+	}
+	// Remove null bytes
+	$input = str_replace(chr(0), '', $input);
+	// Trim whitespace
+	$input = trim($input);
+	return $input;
+}
+
+// Validate URL - only allow http/https
+function validateUrl($url) {
+	$url = trim($url);
+	if (empty($url)) return '';
+	
+	// Only allow http and https URLs
+	if (!preg_match('/^https?:\/\//i', $url)) {
+		// If no protocol, assume https
+		if (preg_match('/^[a-zA-Z0-9]/', $url)) {
+			$url = 'https://' . $url;
+		} else {
+			return '';
+		}
+	}
+	
+	// Basic URL validation - check for valid characters
+	if (!preg_match('/^https?:\/\/[a-zA-Z0-9][-a-zA-Z0-9+&@#\/%?=~_|!:,.;]*$/i', $url)) {
+		return '';
+	}
+	
+	return $url;
+}
+
+// Generate CSRF token
+function generateCsrfToken() {
+	if (!isset($_SESSION['csrf_token'])) {
+		// PHP 5.2 compatible random token generation
+		if (function_exists('openssl_random_pseudo_bytes')) {
+			$_SESSION['csrf_token'] = bin2hex(openssl_random_pseudo_bytes(32));
+		} else {
+			// Fallback for older PHP versions
+			$_SESSION['csrf_token'] = md5(uniqid(mt_rand(), true) . mt_rand() . time());
+		}
+	}
+	return $_SESSION['csrf_token'];
+}
+
+// Verify CSRF token
+function verifyCsrfToken($token) {
+	if (!isset($_SESSION['csrf_token'])) {
+		return false;
+	}
+	// PHP 5.6+ has hash_equals, fallback for older versions
+	if (function_exists('hash_equals')) {
+		return hash_equals($_SESSION['csrf_token'], $token);
+	} else {
+		// Timing-safe comparison for older PHP
+		$expected = $_SESSION['csrf_token'];
+		if (strlen($expected) !== strlen($token)) {
+			return false;
+		}
+		$result = 0;
+		for ($i = 0; $i < strlen($expected); $i++) {
+			$result |= ord($expected[$i]) ^ ord($token[$i]);
+		}
+		return $result === 0;
+	}
+}
 
 // Simple MD5 verification (works on any PHP version)
 function verify_password($password, $hash) {
@@ -24,16 +148,23 @@ function verify_password($password, $hash) {
 
 session_start();
 
+// Regenerate session ID on login to prevent session fixation
+function regenerateSession() {
+	session_regenerate_id(true);
+}
+
 // Login handler
 if (isset($_POST['login'])) {
-	$username = $_POST['username'];
-	$password = $_POST['password'];
+	$username = sanitizeInput($_POST['username']);
+	$password = $_POST['password']; // Don't sanitize password before hash check
 	
 	// Check if user exists and verify password
 	if (isset($USERS[$username]) && verify_password($password, $USERS[$username])) {
+		regenerateSession(); // Prevent session fixation
 		$_SESSION['authenticated'] = true;
 		$_SESSION['username'] = $username;
 		$_SESSION['login_time'] = time();
+		generateCsrfToken(); // Generate new CSRF token
 		header('Location: ' . $_SERVER['PHP_SELF'] . '?' . $_SERVER['QUERY_STRING']);
 		exit;
 	} else {
@@ -367,20 +498,25 @@ $availableIcons = getIconFiles($year);
 // Handle DELETE action
 // ============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEvent) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-	
-	// Create backup before deleting
-	$eventInfo = "DELETE day=$day no=$no";
-	$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
-	if ($backupFile) {
-		$backupCreated = "Backup created: " . basename($backupFile);
-	} else {
-		$message = "Warning: Could not create backup file. Delete cancelled for safety.";
+	// Verify CSRF token
+	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
-	}
-	
-	// Only proceed with delete if backup was successful
-	if (!$backupFile) {
+	} else {
+		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		
+		// Create backup before deleting
+		$eventInfo = "DELETE day=$day no=$no";
+		$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
+		if ($backupFile) {
+			$backupCreated = "Backup created: " . basename($backupFile);
+		} else {
+			$message = "Warning: Could not create backup file. Delete cancelled for safety.";
+			$messageType = "error";
+		}
+		
+		// Only proceed with delete if backup was successful
+		if (!$backupFile) {
 		// Skip delete - backup failed
 	} else {
 		// Read and process file
@@ -427,58 +563,67 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 		}
 	}
 	} // end backup success check
+	} // end CSRF check
 }
 
 // ============================================
 // Handle form submission for NEW event
 // ============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-	
-	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
-	if (get_magic_quotes_gpc()) {
-		$_POST = stripslashes_deep($_POST);
-	}
-	
-	// Get the day from POST (user can select it for new events)
-	$day = intval($_POST['day']);
-	
-	// Create backup before editing (if file exists)
-	if (file_exists($filename)) {
-		$eventInfo = "NEW day=$day kennel=" . $_POST['kennel'];
-		$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
-		if ($backupFile) {
-			$backupCreated = "Backup created: " . basename($backupFile);
-		} else {
-			// For new events, we can proceed even if backup fails (file might not exist yet)
-			error_log("Warning: Could not create backup for new event, proceeding anyway");
+	// Verify CSRF token
+	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+		$message = "Security error: Invalid request. Please try again.";
+		$messageType = "error";
+	} else {
+		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		
+		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+		if (get_magic_quotes_gpc()) {
+			$_POST = stripslashes_deep($_POST);
 		}
-	}
-	
-	// Build Trail Type line
-	$trailTypeLine = '';
-	if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
-		$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
-	}
-	
-	// Build Bring line from checkboxes
-	$bringLine = '';
-	if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
-		$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
-	}
-	
-	// Build description
-	$desc = $_POST['desc'];
-	$desc = str_replace("\r\n", "<br />", $desc);
-	$desc = str_replace("\n", "<br />", $desc);
-	$desc = str_replace("\r", "<br />", $desc);
-	
-	// Append Trail Type and Bring lines to description
-	$desc = $desc . $trailTypeLine . $bringLine;
-	
-	// Get address for weather lookup
-	$address = $_POST['address'];
-	$weatherLocation = '';
+		
+		// Sanitize all inputs
+		$_POST = sanitizeInput($_POST);
+		
+		// Get the day from POST (user can select it for new events)
+		$day = intval($_POST['day']);
+		
+		// Create backup before editing (if file exists)
+		if (file_exists($filename)) {
+			$eventInfo = "NEW day=$day kennel=" . $_POST['kennel'];
+			$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
+			if ($backupFile) {
+				$backupCreated = "Backup created: " . basename($backupFile);
+			} else {
+				// For new events, we can proceed even if backup fails (file might not exist yet)
+				error_log("Warning: Could not create backup for new event, proceeding anyway");
+			}
+		}
+		
+		// Build Trail Type line
+		$trailTypeLine = '';
+		if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
+			$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
+		}
+		
+		// Build Bring line from checkboxes
+		$bringLine = '';
+		if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
+			$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
+		}
+		
+		// Build description - sanitize HTML (allow safe tags, remove XSS)
+		$desc = sanitizeHtml($_POST['desc']);
+		$desc = str_replace("\r\n", "<br />", $desc);
+		$desc = str_replace("\n", "<br />", $desc);
+		$desc = str_replace("\r", "<br />", $desc);
+		
+		// Append Trail Type and Bring lines to description
+		$desc = $desc . $trailTypeLine . $bringLine;
+		
+		// Get address for weather lookup
+		$address = $_POST['address'];
+		$weatherLocation = '';
 	
 	if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
 		$weatherLocation = $matches[1];
@@ -503,7 +648,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	
 	$desc .= $weatherWidget;
 	
-	// Convert address line breaks
+	// Sanitize and convert address line breaks
+	$address = sanitizeHtml($address);
 	$address = str_replace("\r\n", "<br />", $address);
 	$address = str_replace("\n", "<br />", $address);
 	$address = str_replace("\r", "<br />", $address);
@@ -514,19 +660,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	// Get twilight time
 	$twilight = getTwilightEnd($day, $month, $year);
 	
+	// Validate maplink URL
+	$maplink = validateUrl($_POST['maplink']);
+	
 	// Build new event line
 	$newEventData = array(
 		$day,
-		$_POST['kennel'],
-		$_POST['type'],
-		$_POST['title'],
-		$_POST['run'],
-		$_POST['hares'],
-		$_POST['time'],
+		sanitizeHtml($_POST['kennel']),
+		sanitizeHtml($_POST['type']),
+		sanitizeHtml($_POST['title']),
+		sanitizeHtml($_POST['run']),
+		sanitizeHtml($_POST['hares']),
+		sanitizeHtml($_POST['time']),
 		$address,
-		$_POST['maplink'],
-		$_POST['hashcash'],
-		$_POST['turds'],
+		$maplink,
+		sanitizeHtml($_POST['hashcash']),
+		sanitizeHtml($_POST['turds']),
 		'', // tweet
 		$twilight, // twilight
 		$autoDate,
@@ -583,70 +732,79 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		$message = "Error: Unable to write to file. Check file permissions.";
 		$messageType = "error";
 	}
+	} // end CSRF check
 }
 
 // ============================================
 // Handle form submission for EDITING existing event
 // ============================================
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEvent) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-	
-	// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
-	if (get_magic_quotes_gpc()) {
-		$_POST = stripslashes_deep($_POST);
-	}
-	
-	// Create backup before editing
-	$eventInfo = "EDIT day=$day no=$no kennel=" . $_POST['kennel'];
-	$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
-	if ($backupFile) {
-		$backupCreated = "Backup created: " . basename($backupFile);
-	} else {
-		$message = "Warning: Could not create backup file.";
+	// Verify CSRF token
+	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
-	}
-	
-	// RELOAD the file to get the latest version before writing
-	$lines = file($filename, FILE_IGNORE_NEW_LINES);
-	$newLines = array();
-	$n = 0;
-	$lastDay = "";
-	$targetLineIndex = -1;
-	
-	// Find the target line
-	foreach ($lines as $index => $line) {
-		if ($index == 0) {
-			$newLines[] = $line; // Keep header
-			continue;
+	} else {
+		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		
+		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
+		if (get_magic_quotes_gpc()) {
+			$_POST = stripslashes_deep($_POST);
 		}
 		
-		$data = explode("\t", $line);
-		$d = isset($data[0]) ? $data[0] : '';
+		// Sanitize all inputs
+		$_POST = sanitizeInput($_POST);
 		
-		if ($d != $lastDay) {
-			$n = 1;
+		// Create backup before editing
+		$eventInfo = "EDIT day=$day no=$no kennel=" . $_POST['kennel'];
+		$backupFile = createBackup($filename, $_SESSION['username'], $eventInfo);
+		if ($backupFile) {
+			$backupCreated = "Backup created: " . basename($backupFile);
 		} else {
-			$n += 1;
+			$message = "Warning: Could not create backup file.";
+			$messageType = "error";
 		}
-		$lastDay = $d;
 		
-		if ($d == $day && $n == $no) {
-			$targetLineIndex = $index;
-			
-			// Build Trail Type line
-			$trailTypeLine = '';
-			if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
-				$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
+		// RELOAD the file to get the latest version before writing
+		$lines = file($filename, FILE_IGNORE_NEW_LINES);
+		$newLines = array();
+		$n = 0;
+		$lastDay = "";
+		$targetLineIndex = -1;
+		
+		// Find the target line
+		foreach ($lines as $index => $line) {
+			if ($index == 0) {
+				$newLines[] = $line; // Keep header
+				continue;
 			}
 			
-			// Build Bring line from checkboxes
-			$bringLine = '';
-			if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
-				$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
-			}
+			$data = explode("\t", $line);
+			$d = isset($data[0]) ? $data[0] : '';
 			
-			// Build description with weather widget
-			$desc = $_POST['desc'];
+			if ($d != $lastDay) {
+				$n = 1;
+			} else {
+				$n += 1;
+			}
+			$lastDay = $d;
+			
+			if ($d == $day && $n == $no) {
+				$targetLineIndex = $index;
+				
+				// Build Trail Type line
+				$trailTypeLine = '';
+				if (isset($_POST['trailtype']) && !empty($_POST['trailtype'])) {
+					$trailTypeLine = '<br /><br />Trail Type: ' . $_POST['trailtype'];
+				}
+				
+				// Build Bring line from checkboxes
+				$bringLine = '';
+				if (isset($_POST['bring']) && is_array($_POST['bring']) && count($_POST['bring']) > 0) {
+					$bringLine = '<br /><br />Bring: ' . implode(', ', $_POST['bring']);
+				}
+			
+			// Build description - sanitize HTML (allow safe tags, remove XSS)
+			$desc = sanitizeHtml($_POST['desc']);
 			$desc = str_replace("\r\n", "<br />", $desc);
 			$desc = str_replace("\n", "<br />", $desc);
 			$desc = str_replace("\r", "<br />", $desc);
@@ -681,24 +839,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			
 			$desc .= $weatherWidget;
 			
+			// Sanitize and convert address line breaks
+			$address = sanitizeHtml($address);
 			$address = str_replace("\r\n", "<br />", $address);
 			$address = str_replace("\n", "<br />", $address);
 			$address = str_replace("\r", "<br />", $address);
 			
 			$autoDate = generateDateString($day, $month, $year);
 			
+			// Validate maplink URL
+			$maplink = validateUrl($_POST['maplink']);
+			
+			// Sanitize all fields to remove XSS while allowing safe HTML
 			$updatedData = array(
 				$day,
-				$_POST['kennel'],
-				$_POST['type'],
-				$_POST['title'],
-				$_POST['run'],
-				$_POST['hares'],
-				$_POST['time'],
+				sanitizeHtml($_POST['kennel']),
+				sanitizeHtml($_POST['type']),
+				sanitizeHtml($_POST['title']),
+				sanitizeHtml($_POST['run']),
+				sanitizeHtml($_POST['hares']),
+				sanitizeHtml($_POST['time']),
 				$address,
-				$_POST['maplink'],
-				$_POST['hashcash'],
-				$_POST['turds'],
+				$maplink,
+				sanitizeHtml($_POST['hashcash']),
+				sanitizeHtml($_POST['turds']),
 				'',
 				'',
 				$autoDate,
@@ -727,6 +891,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			$messageType = "error";
 		}
 	}
+	} // end CSRF check
 }
 
 // Load current event data (for editing existing events)
@@ -1059,6 +1224,7 @@ $nextNo = $no + 1;
 		<?php endif; ?>
 		
 		<form method="POST" action="" id="editForm" onsubmit="return allowLeave();">
+			<input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 			<?php if ($isNewEvent): ?>
 			<div class="form-group">
 				<label>Date:</label>
@@ -1198,11 +1364,11 @@ $nextNo = $no + 1;
 				<div class="checkbox-grid">
 					<?php
 					$bringOptions = array(
-						'Flashlight', 'Extra Shoes', 'Rain Gear', 'Long Pants/Socks',
-						'Vessel', 'Bowl/Spork', 'Extra $', 'Bug Spray',
-						'Swimsuit', 'Birthday Suit', 'DART/Uber', 'Pre-lube',
+						'Flashlight', 'Extra Shoes', 'Extra Clothes', 'Anti-Shiggy',
+						'Glowsticks', 'Virgins', 'On-In $', 'Bug Spray',
+						'Swimsuit', 'Birthday Suit', 'DART', 'Pre-lube',
 						'Leash', 'Trash Bags', 'BYOB', 'BYOE',
-						
+						'Vessel', 'Bowl/Spoon', 'Cash'
 					);
 					
 					// Parse existing bring items from description
@@ -1243,6 +1409,7 @@ $nextNo = $no + 1;
 			<h4>⚠️ Danger Zone</h4>
 			<p>Permanently delete this event. A backup will be created before deletion.</p>
 			<form method="POST" action="" onsubmit="formChanged = false; return confirmDelete();">
+				<input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 				<button type="submit" name="delete" class="btn btn-delete">🗑️ Delete Event</button>
 			</form>
 		</div>
