@@ -605,6 +605,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 			$hashers = loadHashers();
 		}
 	}
+	
+	// Handle selecting existing similar name
+	if (isset($_POST['use_existing'])) {
+		$existingName = sanitizeHasherName($_POST['use_existing']);
+		if (!empty($existingName) && $windowInfo['isOpen'] && hasherExists($existingName, $hashers)) {
+			// Check in as existing hasher
+			if (!isset($attendance[$existingName])) {
+				$attendance[$existingName] = array(
+					'timestamp' => date('Y-m-d H:i:s'),
+					'payment' => ''
+				);
+				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+				updateTally($existingName, $kennel, 1);
+				$message = "Welcome back! \"" . htmlspecialchars($existingName) . "\" is checked in!";
+			} else {
+				$message = "\"" . htmlspecialchars($existingName) . "\" is already checked in.";
+			}
+			$newHasherName = '';
+		}
+	}
 }
 
 // Handle rebuild tally request (admin function)
@@ -830,6 +850,21 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 			background: #9e9e9e;
 			color: white;
 		}
+		.confirm-box .btn-similar {
+			background: #2196F3;
+			color: white;
+			padding: 12px 20px;
+			border: none;
+			border-radius: 5px;
+			cursor: pointer;
+			font-size: 14px;
+		}
+		.confirm-box .btn-similar:hover {
+			background: #1976D2;
+		}
+		.similar-buttons {
+			margin: 15px 0;
+		}
 		.add-new-section {
 			background: #e8eaf6;
 			border: 1px solid #3f51b5;
@@ -1017,34 +1052,36 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 	
 	<?php if ($showConfirmAdd): ?>
 	<div class="confirm-box">
-		<h4>⚠️ Similar Names Found</h4>
-		<p>Are you sure you want to add "<strong><?php echo htmlspecialchars($newHasherName); ?></strong>"?</p>
-		<p>These similar names already exist in the list:</p>
-		<ul class="similar-list">
+		<h4>🤔 Did You Mean...?</h4>
+		<p>You entered: "<strong><?php echo htmlspecialchars($newHasherName); ?></strong>"</p>
+		<p>We found similar names:</p>
+		<div class="similar-buttons">
 			<?php foreach ($similarNames as $similar): ?>
-			<li><?php echo htmlspecialchars($similar); ?></li>
+			<form method="POST" style="display: inline-block; margin: 5px;">
+				<input type="hidden" name="use_existing" value="<?php echo htmlspecialchars($similar); ?>">
+				<button type="submit" class="btn-similar">I'm "<?php echo htmlspecialchars($similar); ?>"</button>
+			</form>
 			<?php endforeach; ?>
-		</ul>
-		<p>If one of these is you, please cancel and check in with your existing name.</p>
-		<div class="buttons">
-			<form method="POST" style="display: inline;">
-				<input type="hidden" name="confirmed_name" value="<?php echo htmlspecialchars($newHasherName); ?>">
-				<select name="confirmed_payment" class="payment-select" style="margin-right: 10px;">
-					<?php foreach ($paymentOptions as $opt): ?>
-					<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?></option>
-					<?php endforeach; ?>
-				</select>
-				<button type="submit" name="confirm_add" class="btn-confirm">✅ Yes, Add New Name</button>
-			</form>
-			<form method="GET" style="display: inline;">
-				<input type="hidden" name="year" value="<?php echo $year; ?>">
-				<input type="hidden" name="month" value="<?php echo $month; ?>">
-				<input type="hidden" name="day" value="<?php echo $day; ?>">
-				<input type="hidden" name="no" value="<?php echo $no; ?>">
-				<?php if ($TESTING_MODE): ?><input type="hidden" name="test" value="1"><?php endif; ?>
-				<button type="submit" class="btn-cancel">❌ Cancel</button>
-			</form>
 		</div>
+		<hr style="margin: 15px 0;">
+		<p>None of these? Add yourself as a new hasher:</p>
+		<form method="POST">
+			<input type="hidden" name="confirmed_name" value="<?php echo htmlspecialchars($newHasherName); ?>">
+			<select name="confirmed_payment" class="payment-select" style="margin-right: 10px;">
+				<?php foreach ($paymentOptions as $opt): ?>
+				<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?></option>
+				<?php endforeach; ?>
+			</select>
+			<button type="submit" name="confirm_add" class="btn-confirm">➕ Add "<?php echo htmlspecialchars($newHasherName); ?>" as new</button>
+		</form>
+		<form method="GET" style="margin-top: 10px;">
+			<input type="hidden" name="year" value="<?php echo $year; ?>">
+			<input type="hidden" name="month" value="<?php echo $month; ?>">
+			<input type="hidden" name="day" value="<?php echo $day; ?>">
+			<input type="hidden" name="no" value="<?php echo $no; ?>">
+			<?php if ($TESTING_MODE): ?><input type="hidden" name="test" value="1"><?php endif; ?>
+			<button type="submit" class="btn-cancel">❌ Cancel</button>
+		</form>
 	</div>
 	<?php endif; ?>
 	

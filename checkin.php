@@ -971,9 +971,9 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 	<?php if ($showSimilarNames): ?>
 	<!-- Similar Names Confirmation -->
 	<div class="action-section" style="background: #fff3e0; border-color: #ff9800;">
-		<h3>🤔 Is this you?</h3>
+		<h3>🤔 Did You Mean...?</h3>
 		<p>You entered: <strong><?php echo htmlspecialchars($pendingName); ?></strong></p>
-		<p>We found similar names already on the list:</p>
+		<p>We found similar names:</p>
 		
 		<?php foreach ($similarNames as $similar): ?>
 		<form method="POST" style="margin-bottom: 10px;">
