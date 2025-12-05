@@ -17,5 +17,7 @@ $USERS = array(
 	'MBennett' => 'b599f1365e1832f5e66c8e88f8fede78',
 	'Fourplay' => '4e6175b953b7488a33cafe71db52c3ae',
 	'doubledribble' => 'd884306a107cfc48ac34bbb3d0a61917', // 2025-12-01 13:04:57
+    'aileenkaufman' => 'b4205f1bd222c74799dfe719202930b7', // 2025-12-05 10:19:37
+
 );
 ?>

@@ -189,13 +189,11 @@ function parseEventLine($line) {
 	return explode("\t", rtrim($line, "\r\n"));
 }
 
-// Create unique key for an event (day + kennel + title + run number)
+// Create unique key for an event (day + kennel only)
 function getEventKey($data) {
 	$day = isset($data[0]) ? trim($data[0]) : '';
 	$kennel = isset($data[1]) ? trim($data[1]) : '';
-	$title = isset($data[3]) ? trim($data[3]) : '';
-	$run = isset($data[4]) ? trim($data[4]) : '';
-	return $day . '|' . strtolower($kennel) . '|' . strtolower($title) . '|' . $run;
+	return $day . '|' . strtolower($kennel);
 }
 
 // Calculate content length (non-empty fields)
@@ -239,20 +237,33 @@ function getBackupsForFile($dataFilename) {
 	if ($files) {
 		foreach ($files as $file) {
 			// Extract date from filename: YYYY-MM.txt.YYYY-MM-DD_HH-ii-ss.bak
-			if (preg_match('/\.(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})\.bak$/', $file, $matches)) {
-				$dateStr = str_replace('_', ' ', str_replace('-', ':', substr($matches[1], 0, 10) . ' ' . substr($matches[1], 11)));
-				$dateStr = str_replace(':', '-', substr($dateStr, 0, 10)) . substr($dateStr, 10);
-				$timestamp = strtotime(str_replace('_', ' ', $matches[1]));
+			if (preg_match('/\.(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.bak$/', $file, $matches)) {
+				// Parse components: YYYY-MM-DD_HH-MM-SS
+				$year = intval($matches[1]);
+				$month = intval($matches[2]);
+				$day = intval($matches[3]);
+				$hour = intval($matches[4]);
+				$min = intval($matches[5]);
+				$sec = intval($matches[6]);
+				
+				// Create timestamp - the backup was made in Pacific time on the server
+				// but we want to display in Central time (EVENT_TIMEZONE is already set)
+				// The filename reflects Pacific time, so we need to convert
+				// Pacific is 2 hours behind Central
+				$timestamp = mktime($hour, $min, $sec, $month, $day, $year);
+				// Add 2 hours to convert from Pacific to Central
+				$timestamp += 2 * 3600;
+				
 				$backups[] = array(
 					'file' => $file,
-					'date' => $matches[1],
+					'date' => $matches[0],
 					'timestamp' => $timestamp,
 					'display_date' => date('M j, Y g:i A', $timestamp)
 				);
 			}
 		}
 		// Sort by timestamp descending (newest first)
-		// PHP 5.2 compatible - use simple bubble sort instead of usort with create_function
+		// PHP 5.2 compatible - use simple bubble sort
 		for ($i = 0; $i < count($backups) - 1; $i++) {
 			for ($j = 0; $j < count($backups) - $i - 1; $j++) {
 				if ($backups[$j]['timestamp'] < $backups[$j + 1]['timestamp']) {
@@ -426,11 +437,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['recover'])) {
 }
 
 // ============================================
-// GET SELECTED FILE OR DEFAULT
+// GET SELECTED FILE OR DEFAULT TO CURRENT MONTH
 // ============================================
-$selectedFile = isset($_GET['file']) ? sanitizeInput($_GET['file']) : '';
+$currentMonthFile = date('Y-m') . '.txt';
+$selectedFile = isset($_GET['file']) ? sanitizeInput($_GET['file']) : $currentMonthFile;
 $dataFiles = getDataFiles();
 $problems = array();
+
+// Validate selected file exists, otherwise fall back to current month
+if (!in_array(DATA_DIR . $selectedFile, $dataFiles)) {
+	$selectedFile = $currentMonthFile;
+}
 
 if (!empty($selectedFile) && in_array(DATA_DIR . $selectedFile, $dataFiles)) {
 	$problems = findProblems(DATA_DIR . $selectedFile);
@@ -658,6 +675,44 @@ $csrfToken = generateCsrfToken();
 			color: #666;
 			margin-top: 5px;
 		}
+		.diff-table {
+			width: 100%;
+			border-collapse: collapse;
+			margin-bottom: 15px;
+			font-size: 14px;
+		}
+		.diff-table th, .diff-table td {
+			padding: 8px 12px;
+			text-align: left;
+			border: 1px solid #ddd;
+			word-break: break-word;
+		}
+		.diff-table th {
+			background: #f5f5f5;
+			font-weight: bold;
+		}
+		.diff-table .field-name {
+			width: 100px;
+			font-weight: bold;
+			color: #666;
+			background: #fafafa;
+		}
+		.diff-table .backup-col {
+			background: #e8f5e9;
+		}
+		.diff-table .current-col {
+			background: #ffebee;
+		}
+		.diff-table th.backup-col {
+			background: #c8e6c9;
+		}
+		.diff-table th.current-col {
+			background: #ffcdd2;
+		}
+		.diff-table .empty {
+			color: #999;
+			font-style: italic;
+		}
 	</style>
 </head>
 <body>
@@ -682,7 +737,6 @@ $csrfToken = generateCsrfToken();
 			<form method="GET">
 				<label><strong>Select Month File:</strong></label>
 				<select name="file">
-					<option value="">-- Select a file --</option>
 					<?php foreach ($dataFiles as $file): ?>
 					<option value="<?php echo h(basename($file)); ?>" <?php echo (basename($file) === $selectedFile) ? 'selected' : ''; ?>>
 						<?php echo h(basename($file)); ?>
@@ -693,79 +747,115 @@ $csrfToken = generateCsrfToken();
 			</form>
 		</div>
 		
-		<?php if (!empty($selectedFile)): ?>
-			<?php 
-			$deletedCount = 0;
-			$lessenedCount = 0;
-			foreach ($problems as $p) {
-				if ($p['type'] === 'DELETED') $deletedCount++;
-				else $lessenedCount++;
-			}
-			?>
-			
-			<div class="stats">
-				<div class="stat-box deleted">
-					<div class="number"><?php echo $deletedCount; ?></div>
-					<div class="label">Deleted Events</div>
-				</div>
-				<div class="stat-box lessened">
-					<div class="number"><?php echo $lessenedCount; ?></div>
-					<div class="label">Lessened Events</div>
-				</div>
+		<?php 
+		$deletedCount = 0;
+		$lessenedCount = 0;
+		foreach ($problems as $p) {
+			if ($p['type'] === 'DELETED') $deletedCount++;
+			else $lessenedCount++;
+		}
+		?>
+		
+		<div class="stats">
+			<div class="stat-box deleted">
+				<div class="number"><?php echo $deletedCount; ?></div>
+				<div class="label">Deleted Events</div>
 			</div>
-			
-			<?php if (count($problems) === 0): ?>
-			<div class="no-problems">
-				<h3>✅ No Problems Found</h3>
-				<p>All events in <?php echo h($selectedFile); ?> match or exceed their backup versions.</p>
+			<div class="stat-box lessened">
+				<div class="number"><?php echo $lessenedCount; ?></div>
+				<div class="label">Lessened Events</div>
 			</div>
-			<?php else: ?>
-				<?php foreach ($problems as $problem): ?>
-				<div class="problem-card">
-					<div class="problem-header <?php echo strtolower($problem['type']); ?>">
-						<div>
-							<div class="problem-title">
-								Day <?php echo h($problem['day']); ?>: <?php echo h($problem['kennel']); ?>
-								<?php if ($problem['title']): ?> - <?php echo h($problem['title']); ?><?php endif; ?>
-							</div>
-							<div class="backup-date">Best backup from: <?php echo h($problem['backup_date']); ?></div>
+		</div>
+		
+		<?php if (count($problems) === 0): ?>
+		<div class="no-problems">
+			<h3>✅ No Problems Found</h3>
+			<p>All events in <?php echo h($selectedFile); ?> match or exceed their backup versions.</p>
+		</div>
+		<?php else: ?>
+			<?php foreach ($problems as $problem): ?>
+			<div class="problem-card">
+				<div class="problem-header <?php echo strtolower($problem['type']); ?>">
+					<div>
+						<div class="problem-title">
+							Day <?php echo h($problem['day']); ?>: <?php echo h($problem['kennel']); ?>
+							<?php if ($problem['title']): ?> - <?php echo h($problem['title']); ?><?php endif; ?>
 						</div>
+						<div class="backup-date">Best backup from: <?php echo h($problem['backup_date']); ?></div>
+					</div>
 						<span class="problem-badge <?php echo strtolower($problem['type']); ?>"><?php echo $problem['type']; ?></span>
 					</div>
 					<div class="problem-body">
-						<div class="problem-details">
-							<div class="detail-box backup">
-								<h4>📦 Backup Version (<?php echo $problem['backup_length']; ?> chars)</h4>
-								<ul class="field-list">
-									<?php 
-									$fieldNames = array('Day', 'Kennel', 'Type', 'Title', 'Run#', 'Hares', 'Time', 'Address', 'MapLink', 'HashCash', 'TURDs', 'Tweet', 'Twilight', 'Date', 'Description');
-									foreach ($problem['backup_data'] as $i => $val): 
-										$trimVal = trim($val);
-										if (empty($trimVal)) continue;
-									?>
-									<li><span class="field-label"><?php echo isset($fieldNames[$i]) ? $fieldNames[$i] : "Field $i"; ?>:</span> <?php echo h(substr($val, 0, 100)); ?><?php echo strlen($val) > 100 ? '...' : ''; ?></li>
-									<?php endforeach; ?>
-								</ul>
-							</div>
-							<?php if ($problem['type'] === 'LESSENED'): ?>
-							<div class="detail-box current">
-								<h4>📄 Current Version (<?php echo $problem['current_length']; ?> chars)</h4>
-								<ul class="field-list">
-									<?php foreach ($problem['current_data'] as $i => $val): 
-										$trimVal = trim($val);
-										if (empty($trimVal)) continue;
-									?>
-									<li><span class="field-label"><?php echo isset($fieldNames[$i]) ? $fieldNames[$i] : "Field $i"; ?>:</span> <?php echo h(substr($val, 0, 100)); ?><?php echo strlen($val) > 100 ? '...' : ''; ?></li>
-									<?php endforeach; ?>
-								</ul>
-							</div>
-							<?php else: ?>
-							<div class="detail-box current">
-								<h4>📄 Current Version</h4>
-								<p style="color: #999; font-style: italic;">Event does not exist in current file</p>
-							</div>
-							<?php endif; ?>
+						<?php 
+						$fieldNames = array('Day', 'Kennel', 'Type', 'Title', 'Run#', 'Hares', 'Time', 'Address', 'MapLink', 'HashCash', 'TURDs', 'Tweet', 'Twilight', 'Date', 'Description');
+						
+						// Find fields that differ
+						$diffFields = array();
+						foreach ($problem['backup_data'] as $i => $backupVal) {
+							$backupVal = trim($backupVal);
+							$currentVal = '';
+							if ($problem['current_data'] !== null && isset($problem['current_data'][$i])) {
+								$currentVal = trim($problem['current_data'][$i]);
+							}
+							
+							// Only show if different
+							if ($backupVal !== $currentVal) {
+								$diffFields[$i] = array(
+									'name' => isset($fieldNames[$i]) ? $fieldNames[$i] : "Field $i",
+									'backup' => $backupVal,
+									'current' => $currentVal
+								);
+							}
+						}
+						// Also check if current has fields backup doesn't
+						if ($problem['current_data'] !== null) {
+							foreach ($problem['current_data'] as $i => $currentVal) {
+								$currentVal = trim($currentVal);
+								if (!isset($problem['backup_data'][$i]) || trim($problem['backup_data'][$i]) === '') {
+									if (!empty($currentVal) && !isset($diffFields[$i])) {
+										$diffFields[$i] = array(
+											'name' => isset($fieldNames[$i]) ? $fieldNames[$i] : "Field $i",
+											'backup' => '',
+											'current' => $currentVal
+										);
+									}
+								}
+							}
+						}
+						?>
+						
+						<?php if ($problem['type'] === 'DELETED'): ?>
+						<div class="detail-box backup" style="margin-bottom: 15px;">
+							<h4>📦 Data to Restore</h4>
+							<ul class="field-list">
+								<?php foreach ($problem['backup_data'] as $i => $val): 
+									$trimVal = trim($val);
+									if (empty($trimVal)) continue;
+								?>
+								<li><span class="field-label"><?php echo isset($fieldNames[$i]) ? $fieldNames[$i] : "Field $i"; ?>:</span> <?php echo h(substr($val, 0, 150)); ?><?php echo strlen($val) > 150 ? '...' : ''; ?></li>
+								<?php endforeach; ?>
+							</ul>
 						</div>
+						<?php else: ?>
+						<table class="diff-table">
+							<thead>
+								<tr>
+									<th>Field</th>
+									<th class="backup-col">📦 Backup</th>
+									<th class="current-col">📄 Current</th>
+								</tr>
+							</thead>
+							<tbody>
+								<?php foreach ($diffFields as $i => $diff): ?>
+								<tr>
+									<td class="field-name"><?php echo h($diff['name']); ?></td>
+									<td class="backup-col"><?php echo !empty($diff['backup']) ? h(substr($diff['backup'], 0, 150)) . (strlen($diff['backup']) > 150 ? '...' : '') : '<em class="empty">empty</em>'; ?></td>
+									<td class="current-col"><?php echo !empty($diff['current']) ? h(substr($diff['current'], 0, 150)) . (strlen($diff['current']) > 150 ? '...' : '') : '<em class="empty">empty</em>'; ?></td>
+								</tr>
+								<?php endforeach; ?>
+							</tbody>
+						</table>
+						<?php endif; ?>
 						
 						<form method="POST" onsubmit="return confirm('Are you sure you want to recover this event from the backup?');">
 							<input type="hidden" name="csrf_token" value="<?php echo h($csrfToken); ?>">
@@ -780,12 +870,6 @@ $csrfToken = generateCsrfToken();
 				</div>
 				<?php endforeach; ?>
 			<?php endif; ?>
-		<?php else: ?>
-		<div class="no-problems">
-			<h3>📂 Select a File</h3>
-			<p>Choose a month file above to scan for deleted or modified events.</p>
-		</div>
-		<?php endif; ?>
 	</div>
 </body>
 </html>
