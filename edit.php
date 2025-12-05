@@ -1,7 +1,7 @@
 <?php
 // ============================================
 // EDIT.PHP - Event Editor for DFW Hash House Harriers
-// Version 2.1
+// Version 2.2
 // ============================================
 
 // Enable error reporting for debugging (comment out in production)
@@ -9,12 +9,19 @@
 // ini_set('display_errors', 1);
 
 // ============================================
+// TIMEZONE CONFIGURATION
+// ============================================
+// Server may be in different timezone than events (e.g., Pacific vs Central)
+// Set this to the timezone where events actually occur
+date_default_timezone_set('America/Chicago'); // Central Time for DFW
+
+// ============================================
 // MULTI-USER AUTHENTICATION CONFIGURATION
 // ============================================
 // Users are stored in a separate file to avoid overwriting during updates
 // Use password.php to generate new password hashes
 
-define('EDITPHP_VERSION', '2.1');
+define('EDITPHP_VERSION', '2.2');
 
 // Load users from separate file
 require_once('users.php');

@@ -12,6 +12,9 @@
 	<link href="print.css" rel="stylesheet" type="text/css" media="print" />
 
   <?php
+	// Timezone configuration - DFW is Central Time
+	date_default_timezone_set('America/Chicago');
+	
 	// Include twilight calculator
 	require_once('twilight.php');
 	

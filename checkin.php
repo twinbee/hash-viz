@@ -1,8 +1,16 @@
 <?php
 // ============================================
 // CHECKIN.PHP - Personal Check-in for DFW Hash House Harriers
-// Version 1.0
+// Version 1.2
 // ============================================
+
+// ============================================
+// TIMEZONE CONFIGURATION
+// ============================================
+// Server may be in different timezone than events (e.g., Pacific vs Central)
+// Set this to the timezone where events actually occur
+define('EVENT_TIMEZONE', 'America/Chicago'); // Central Time for DFW
+date_default_timezone_set(EVENT_TIMEZONE);
 
 // Data directory for attendance records
 define('ROLLCALL_DIR', '../../android/rollcall/');
@@ -199,43 +207,124 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 }
 
 // ============================================
-// HELPER: Get all-time stats for a hasher
+// TALLY SYSTEM - Maintains running totals
 // ============================================
-function getHasherStats($hasherName) {
-	$stats = array(
-		'total' => 0,
-		'byKennel' => array()
-	);
-	
-	if (!file_exists(ROLLCALL_DIR)) {
-		return $stats;
+define('TALLY_FILE', 'tally.txt');
+
+function loadTally() {
+	$file = ROLLCALL_DIR . TALLY_FILE;
+	if (!file_exists($file)) {
+		return array();
 	}
 	
-	$files = glob(ROLLCALL_DIR . "*.txt");
-	foreach ($files as $file) {
-		if (basename($file) == HASHERS_FILE) continue;
-		
-		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-		foreach ($lines as $line) {
-			$parts = explode("\t", $line);
-			if (count($parts) >= 1 && $parts[0] == $hasherName) {
-				$stats['total']++;
-				
-				// Extract kennel from filename
-				$basename = basename($file, '.txt');
-				$fileParts = explode('_', $basename);
-				if (count($fileParts) >= 3) {
-					$kennel = str_replace('_', ' ', implode('_', array_slice($fileParts, 2)));
-					if (!isset($stats['byKennel'][$kennel])) {
-						$stats['byKennel'][$kennel] = 0;
+	$tally = array();
+	$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+	foreach ($lines as $line) {
+		$parts = explode("\t", $line);
+		if (count($parts) >= 2) {
+			$name = $parts[0];
+			$total = intval($parts[1]);
+			$byKennel = array();
+			
+			if (isset($parts[2]) && !empty($parts[2])) {
+				$kennelParts = explode(',', $parts[2]);
+				foreach ($kennelParts as $kp) {
+					$kv = explode(':', $kp);
+					if (count($kv) == 2) {
+						$byKennel[$kv[0]] = intval($kv[1]);
 					}
-					$stats['byKennel'][$kennel]++;
 				}
 			}
+			
+			$tally[$name] = array(
+				'total' => $total,
+				'byKennel' => $byKennel
+			);
 		}
 	}
 	
-	return $stats;
+	return $tally;
+}
+
+function saveTally($tally) {
+	if (!file_exists(ROLLCALL_DIR)) {
+		mkdir(ROLLCALL_DIR, 0755, true);
+	}
+	
+	$file = ROLLCALL_DIR . TALLY_FILE;
+	$lines = array();
+	
+	foreach ($tally as $name => $data) {
+		$kennelStr = '';
+		if (!empty($data['byKennel'])) {
+			$kennelParts = array();
+			foreach ($data['byKennel'] as $kennel => $count) {
+				$kennelParts[] = $kennel . ':' . $count;
+			}
+			$kennelStr = implode(',', $kennelParts);
+		}
+		$lines[] = $name . "\t" . $data['total'] . "\t" . $kennelStr;
+	}
+	
+	file_put_contents($file, implode("\n", $lines), LOCK_EX);
+}
+
+function updateTally($hasherName, $kennel, $increment = 1) {
+	$tally = loadTally();
+	
+	if (!isset($tally[$hasherName])) {
+		$tally[$hasherName] = array('total' => 0, 'byKennel' => array());
+	}
+	
+	$tally[$hasherName]['total'] += $increment;
+	
+	// Sanitize kennel name for storage
+	$kennelSafe = str_replace(array(':', ','), array('-', '-'), $kennel);
+	
+	if (!isset($tally[$hasherName]['byKennel'][$kennelSafe])) {
+		$tally[$hasherName]['byKennel'][$kennelSafe] = 0;
+	}
+	$tally[$hasherName]['byKennel'][$kennelSafe] += $increment;
+	
+	// Ensure counts don't go negative
+	if ($tally[$hasherName]['total'] < 0) {
+		$tally[$hasherName]['total'] = 0;
+	}
+	if ($tally[$hasherName]['byKennel'][$kennelSafe] < 0) {
+		$tally[$hasherName]['byKennel'][$kennelSafe] = 0;
+	}
+	
+	saveTally($tally);
+}
+
+// ============================================
+// HELPER: Get all-time stats for a hasher (from tally)
+// ============================================
+function getHasherStats($hasherName) {
+	$tally = loadTally();
+	
+	if (isset($tally[$hasherName])) {
+		return $tally[$hasherName];
+	}
+	
+	return array('total' => 0, 'byKennel' => array());
+}
+
+// ============================================
+// HELPER: Get top hashers leaderboard (from tally)
+// ============================================
+function getTopHashers($limit = 10) {
+	$tally = loadTally();
+	
+	$counts = array();
+	foreach ($tally as $name => $data) {
+		if ($data['total'] > 0) {
+			$counts[$name] = $data['total'];
+		}
+	}
+	
+	arsort($counts);
+	return array_slice($counts, 0, $limit, true);
 }
 
 // ============================================
@@ -410,6 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 					'payment' => $paymentMethod
 				);
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+				updateTally($rememberedName, $kennel, 1);
 				$message = "You're checked in! 🎉";
 			} else {
 				// Update payment method
@@ -428,6 +518,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 		if ($windowInfo['isOpen'] && isset($attendance[$rememberedName])) {
 			unset($attendance[$rememberedName]);
 			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+			updateTally($rememberedName, $kennel, -1);
 			$message = "You've been checked out.";
 		}
 	}
@@ -449,6 +540,10 @@ $userStats = !empty($rememberedName) ? getHasherStats($rememberedName) : null;
 
 // Head count
 $headCount = count($attendance);
+
+// Get top hashers for leaderboard
+$topHashers = getTopHashers(5); // Show top 5 on personal page
+$maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 ?>
 <!DOCTYPE html>
 <html>
@@ -661,6 +756,52 @@ $headCount = count($attendance);
 			width: 100%;
 		}
 		
+		/* Modal Styles */
+		.modal {
+			display: none;
+			position: fixed;
+			z-index: 1000;
+			left: 0;
+			top: 0;
+			width: 100%;
+			height: 100%;
+			background-color: rgba(0,0,0,0.5);
+			justify-content: center;
+			align-items: center;
+		}
+		.modal-content {
+			background: white;
+			padding: 25px;
+			border-radius: 10px;
+			width: 90%;
+			max-width: 350px;
+			text-align: center;
+		}
+		.modal-content h3 {
+			margin-top: 0;
+			margin-bottom: 10px;
+		}
+		.btn-payment {
+			background: #4CAF50;
+			color: white;
+			margin-bottom: 10px;
+			padding: 15px;
+			font-size: 18px;
+		}
+		.btn-payment:hover {
+			background: #388E3C;
+		}
+		.btn-unpaid {
+			background: #ff9800;
+			color: white;
+			margin-bottom: 10px;
+			padding: 15px;
+			font-size: 16px;
+		}
+		.btn-unpaid:hover {
+			background: #f57c00;
+		}
+		
 		.stats-section {
 			background: white;
 			border: 1px solid #ddd;
@@ -709,7 +850,7 @@ $headCount = count($attendance);
 			color: #f57c00;
 		}
 		
-		.change-name {
+			.change-name {
 			text-align: center;
 			margin-top: 15px;
 			padding-top: 15px;
@@ -718,6 +859,54 @@ $headCount = count($attendance);
 		.change-name a {
 			color: #666;
 			font-size: 14px;
+		}
+		
+		.leaderboard {
+			background: white;
+			border: 1px solid #ddd;
+			border-radius: 5px;
+			padding: 15px;
+			margin-bottom: 15px;
+		}
+		.leaderboard h3 {
+			margin-top: 0;
+			margin-bottom: 15px;
+		}
+		.leaderboard-item {
+			display: flex;
+			align-items: center;
+			margin-bottom: 8px;
+			font-size: 14px;
+		}
+		.leaderboard-rank {
+			width: 25px;
+			font-weight: bold;
+			color: #666;
+		}
+		.leaderboard-name {
+			width: 120px;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.leaderboard-bar-container {
+			flex: 1;
+			height: 20px;
+			background: #eee;
+			border-radius: 3px;
+			margin: 0 10px;
+			overflow: hidden;
+		}
+		.leaderboard-bar {
+			height: 100%;
+			background: linear-gradient(90deg, #4CAF50, #81C784);
+			border-radius: 3px;
+		}
+		.leaderboard-count {
+			width: 30px;
+			text-align: right;
+			font-weight: bold;
+			color: #4CAF50;
 		}
 	</style>
 </head>
@@ -837,27 +1026,73 @@ $headCount = count($attendance);
 	<!-- Check-in/out Form -->
 	<?php if ($windowInfo['isOpen']): ?>
 	<div class="action-section">
+		<?php if (!$isCheckedIn): ?>
+		<!-- Check-in button triggers modal -->
+		<button type="button" id="checkinBtn" class="btn btn-primary btn-block">✅ Check Me In!</button>
+		<?php else: ?>
+		<!-- Already checked in - show update form -->
 		<form method="POST">
 			<div class="form-group">
 				<label>💵 Paid How?</label>
 				<select name="payment">
 					<?php foreach ($paymentOptions as $opt): ?>
 					<option value="<?php echo htmlspecialchars($opt); ?>" <?php echo ($currentPayment == $opt) ? 'selected' : ''; ?>>
-						<?php echo $opt ? htmlspecialchars($opt) : '-- Select Payment Method --'; ?>
+						<?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?>
 					</option>
 					<?php endforeach; ?>
 				</select>
 			</div>
-			
-			<?php if (!$isCheckedIn): ?>
-			<button type="submit" name="checkin" class="btn btn-primary btn-block">✅ Check Me In!</button>
-			<?php else: ?>
 			<button type="submit" name="checkin" class="btn btn-primary btn-block">💾 Update Payment</button>
 			<button type="submit" name="checkout" class="btn btn-danger btn-block" style="margin-top: 10px;">❌ Check Out</button>
-			<?php endif; ?>
 		</form>
+		<?php endif; ?>
 	</div>
 	<?php endif; ?>
+	
+	<!-- Payment Modal -->
+	<div id="paymentModal" class="modal">
+		<div class="modal-content">
+			<h3>💵 How are you paying?</h3>
+			<p style="color: #666; margin-bottom: 20px;">Please select your payment method</p>
+			<form method="POST" id="checkinForm">
+				<?php foreach ($paymentOptions as $opt): ?>
+				<?php if ($opt === ''): ?>
+				<button type="submit" name="checkin" class="btn btn-block btn-unpaid" onclick="document.getElementById('paymentField').value='';">
+					😬 I Haven't Paid Yet
+				</button>
+				<hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
+				<?php else: ?>
+				<button type="submit" name="checkin" class="btn btn-block btn-payment" onclick="document.getElementById('paymentField').value='<?php echo htmlspecialchars($opt); ?>';">
+					<?php echo htmlspecialchars($opt); ?>
+				</button>
+				<?php endif; ?>
+				<?php endforeach; ?>
+				<input type="hidden" name="payment" id="paymentField" value="">
+				<button type="button" class="btn btn-secondary btn-block" style="margin-top: 15px;" onclick="closeModal()">Cancel</button>
+			</form>
+		</div>
+	</div>
+	
+	<script>
+	var modal = document.getElementById('paymentModal');
+	var checkinBtn = document.getElementById('checkinBtn');
+	
+	if (checkinBtn) {
+		checkinBtn.onclick = function() {
+			modal.style.display = 'flex';
+		}
+	}
+	
+	function closeModal() {
+		modal.style.display = 'none';
+	}
+	
+	window.onclick = function(event) {
+		if (event.target == modal) {
+			closeModal();
+		}
+	}
+	</script>
 	
 	<!-- Stats Section -->
 	<?php if ($userStats && $userStats['total'] > 0): ?>
@@ -882,6 +1117,26 @@ $headCount = count($attendance);
 	<div class="stats-section">
 		<h3>📊 Your Hash Stats</h3>
 		<p style="text-align: center; color: #666;">No check-ins recorded yet. This is your first!</p>
+	</div>
+	<?php endif; ?>
+	
+	<!-- Leaderboard -->
+	<?php if (count($topHashers) > 0): ?>
+	<div class="leaderboard">
+		<h3>🏆 Top Hashers</h3>
+		<?php $rank = 1; foreach ($topHashers as $name => $count): ?>
+		<div class="leaderboard-item">
+			<div class="leaderboard-rank"><?php echo $rank; ?>.</div>
+			<div class="leaderboard-name" title="<?php echo htmlspecialchars($name); ?>"><?php echo htmlspecialchars($name); ?></div>
+			<div class="leaderboard-bar-container">
+				<div class="leaderboard-bar" style="width: <?php echo ($count / $maxCount) * 100; ?>%"></div>
+			</div>
+			<div class="leaderboard-count"><?php echo $count; ?></div>
+		</div>
+		<?php $rank++; endforeach; ?>
+		<p style="text-align: center; margin-top: 10px; margin-bottom: 0;">
+			<a href="rollcall.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?><?php echo $TESTING_MODE ? '&test=1' : ''; ?>" style="color: #666; font-size: 12px;">View full leaderboard →</a>
+		</p>
 	</div>
 	<?php endif; ?>
 	

@@ -1,8 +1,16 @@
 <?php
 // ============================================
 // ROLLCALL.PHP - Attendance Tracking for DFW Hash House Harriers
-// Version 1.2
+// Version 1.4
 // ============================================
+
+// ============================================
+// TIMEZONE CONFIGURATION
+// ============================================
+// Server may be in different timezone than events (e.g., Pacific vs Central)
+// Set this to the timezone where events actually occur
+define('EVENT_TIMEZONE', 'America/Chicago'); // Central Time for DFW
+date_default_timezone_set(EVENT_TIMEZONE);
 
 // Data directory for attendance records
 define('ROLLCALL_DIR', '../../android/rollcall/');
@@ -292,74 +300,177 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 }
 
 // ============================================
-// HELPER: Get all-time stats for a hasher
+// TALLY SYSTEM - Maintains running totals
 // ============================================
-function getHasherStats($hasherName) {
-	$stats = array(
-		'total' => 0,
-		'byKennel' => array()
-	);
-	
-	if (!file_exists(ROLLCALL_DIR)) {
-		return $stats;
+// Tally file format: name \t total \t kennel1:count1,kennel2:count2,...
+define('TALLY_FILE', 'tally.txt');
+
+function loadTally() {
+	$file = ROLLCALL_DIR . TALLY_FILE;
+	if (!file_exists($file)) {
+		return array();
 	}
 	
-	$files = glob(ROLLCALL_DIR . "*.txt");
-	foreach ($files as $file) {
-		if (basename($file) == HASHERS_FILE) continue;
-		
-		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-		foreach ($lines as $line) {
-			$parts = explode("\t", $line);
-			if (count($parts) >= 2 && $parts[0] == $hasherName) {
-				$stats['total']++;
-				
-				// Extract kennel from filename
-				$basename = basename($file, '.txt');
-				$parts2 = explode('_', $basename);
-				if (count($parts2) >= 3) {
-					$kennel = str_replace('_', ' ', implode('_', array_slice($parts2, 2)));
-					if (!isset($stats['byKennel'][$kennel])) {
-						$stats['byKennel'][$kennel] = 0;
+	$tally = array();
+	$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+	foreach ($lines as $line) {
+		$parts = explode("\t", $line);
+		if (count($parts) >= 2) {
+			$name = $parts[0];
+			$total = intval($parts[1]);
+			$byKennel = array();
+			
+			if (isset($parts[2]) && !empty($parts[2])) {
+				$kennelParts = explode(',', $parts[2]);
+				foreach ($kennelParts as $kp) {
+					$kv = explode(':', $kp);
+					if (count($kv) == 2) {
+						$byKennel[$kv[0]] = intval($kv[1]);
 					}
-					$stats['byKennel'][$kennel]++;
 				}
 			}
+			
+			$tally[$name] = array(
+				'total' => $total,
+				'byKennel' => $byKennel
+			);
 		}
 	}
 	
-	return $stats;
+	return $tally;
+}
+
+function saveTally($tally) {
+	if (!file_exists(ROLLCALL_DIR)) {
+		mkdir(ROLLCALL_DIR, 0755, true);
+	}
+	
+	$file = ROLLCALL_DIR . TALLY_FILE;
+	$lines = array();
+	
+	foreach ($tally as $name => $data) {
+		$kennelStr = '';
+		if (!empty($data['byKennel'])) {
+			$kennelParts = array();
+			foreach ($data['byKennel'] as $kennel => $count) {
+				$kennelParts[] = $kennel . ':' . $count;
+			}
+			$kennelStr = implode(',', $kennelParts);
+		}
+		$lines[] = $name . "\t" . $data['total'] . "\t" . $kennelStr;
+	}
+	
+	file_put_contents($file, implode("\n", $lines), LOCK_EX);
+}
+
+function updateTally($hasherName, $kennel, $increment = 1) {
+	$tally = loadTally();
+	
+	if (!isset($tally[$hasherName])) {
+		$tally[$hasherName] = array('total' => 0, 'byKennel' => array());
+	}
+	
+	$tally[$hasherName]['total'] += $increment;
+	
+	// Sanitize kennel name for storage (remove colons and commas which are delimiters)
+	$kennelSafe = str_replace(array(':', ','), array('-', '-'), $kennel);
+	
+	if (!isset($tally[$hasherName]['byKennel'][$kennelSafe])) {
+		$tally[$hasherName]['byKennel'][$kennelSafe] = 0;
+	}
+	$tally[$hasherName]['byKennel'][$kennelSafe] += $increment;
+	
+	// Ensure total doesn't go negative
+	if ($tally[$hasherName]['total'] < 0) {
+		$tally[$hasherName]['total'] = 0;
+	}
+	if ($tally[$hasherName]['byKennel'][$kennelSafe] < 0) {
+		$tally[$hasherName]['byKennel'][$kennelSafe] = 0;
+	}
+	
+	saveTally($tally);
 }
 
 // ============================================
-// HELPER: Get top hashers leaderboard
+// HELPER: Get all-time stats for a hasher (from tally)
 // ============================================
-function getTopHashers($limit = 10) {
-	$counts = array();
+function getHasherStats($hasherName) {
+	$tally = loadTally();
 	
-	if (!file_exists(ROLLCALL_DIR)) {
-		return $counts;
+	if (isset($tally[$hasherName])) {
+		return $tally[$hasherName];
 	}
 	
-	$files = glob(ROLLCALL_DIR . "*.txt");
-	foreach ($files as $file) {
-		if (basename($file) == HASHERS_FILE) continue;
-		
-		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-		foreach ($lines as $line) {
-			$parts = explode("\t", $line);
-			if (count($parts) >= 1) {
-				$name = $parts[0];
-				if (!isset($counts[$name])) {
-					$counts[$name] = 0;
-				}
-				$counts[$name]++;
-			}
+	return array('total' => 0, 'byKennel' => array());
+}
+
+// ============================================
+// HELPER: Get top hashers leaderboard (from tally)
+// ============================================
+function getTopHashers($limit = 10) {
+	$tally = loadTally();
+	
+	$counts = array();
+	foreach ($tally as $name => $data) {
+		if ($data['total'] > 0) {
+			$counts[$name] = $data['total'];
 		}
 	}
 	
 	arsort($counts);
 	return array_slice($counts, 0, $limit, true);
+}
+
+// ============================================
+// HELPER: Rebuild tally from all attendance files (run manually if needed)
+// Usage: ?rebuild_tally=1
+// ============================================
+function rebuildTally() {
+	$tally = array();
+	
+	if (!file_exists(ROLLCALL_DIR)) {
+		return $tally;
+	}
+	
+	$files = glob(ROLLCALL_DIR . "*.txt");
+	foreach ($files as $file) {
+		$basename = basename($file);
+		if ($basename == HASHERS_FILE || $basename == TALLY_FILE) continue;
+		
+		// Extract kennel from filename: YYYY-MM-DD_N_KennelName.txt
+		$fileBase = basename($file, '.txt');
+		$fileParts = explode('_', $fileBase);
+		$kennel = '';
+		if (count($fileParts) >= 3) {
+			$kennel = str_replace('_', ' ', implode('_', array_slice($fileParts, 2)));
+			// Sanitize for tally storage
+			$kennel = str_replace(array(':', ','), array('-', '-'), $kennel);
+		}
+		
+		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		foreach ($lines as $line) {
+			$parts = explode("\t", $line);
+			if (count($parts) >= 1 && !empty($parts[0])) {
+				$name = $parts[0];
+				
+				if (!isset($tally[$name])) {
+					$tally[$name] = array('total' => 0, 'byKennel' => array());
+				}
+				
+				$tally[$name]['total']++;
+				
+				if (!empty($kennel)) {
+					if (!isset($tally[$name]['byKennel'][$kennel])) {
+						$tally[$name]['byKennel'][$kennel] = 0;
+					}
+					$tally[$name]['byKennel'][$kennel]++;
+				}
+			}
+		}
+	}
+	
+	saveTally($tally);
+	return $tally;
 }
 
 // ============================================
@@ -405,15 +516,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 		
 		if ($windowInfo['isOpen']) {
 			if (isset($attendance[$hasherName])) {
-				// Check out
+				// Check out - decrement tally
 				unset($attendance[$hasherName]);
+				updateTally($hasherName, $kennel, -1);
 				$message = htmlspecialchars($hasherName) . " checked out.";
 			} else {
-				// Check in with payment method
+				// Check in with payment method - increment tally
 				$attendance[$hasherName] = array(
 					'timestamp' => date('Y-m-d H:i:s'),
 					'payment' => $paymentMethod
 				);
+				updateTally($hasherName, $kennel, 1);
 				$message = htmlspecialchars($hasherName) . " checked in!";
 			}
 			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
@@ -463,6 +576,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 					'payment' => $newPaymentMethod
 				);
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+				updateTally($newHasherName, $kennel, 1);
 				$message = "Welcome! \"" . htmlspecialchars($newHasherName) . "\" has been added and checked in!";
 				$newHasherName = '';
 				// Reload hashers
@@ -484,6 +598,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 				'payment' => $newPaymentMethod
 			);
 			saveAttendance($year, $month, $day, $no, $kennel, $attendance);
+			updateTally($newHasherName, $kennel, 1);
 			$message = "Welcome! \"" . htmlspecialchars($newHasherName) . "\" has been added and checked in!";
 			$newHasherName = '';
 			// Reload hashers
@@ -492,8 +607,32 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	}
 }
 
+// Handle rebuild tally request (admin function)
+if (isset($_GET['rebuild_tally']) && $_GET['rebuild_tally'] == '1') {
+	$tally = rebuildTally();
+	$message = "Tally rebuilt from " . count($tally) . " hashers.";
+}
+
 // Get top hashers for leaderboard
 $topHashers = getTopHashers(10);
+
+// Auto-rebuild tally if empty but attendance files exist
+if (count($topHashers) == 0 && file_exists(ROLLCALL_DIR)) {
+	$attendanceFiles = glob(ROLLCALL_DIR . "*.txt");
+	// Filter out hashers.txt and tally.txt (PHP 5.2 compatible)
+	$filteredFiles = array();
+	foreach ($attendanceFiles as $f) {
+		$base = basename($f);
+		if ($base != HASHERS_FILE && $base != TALLY_FILE) {
+			$filteredFiles[] = $f;
+		}
+	}
+	if (count($filteredFiles) > 0) {
+		rebuildTally();
+		$topHashers = getTopHashers(10);
+	}
+}
+
 $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 
 // Head count
@@ -892,7 +1031,7 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 				<input type="hidden" name="confirmed_name" value="<?php echo htmlspecialchars($newHasherName); ?>">
 				<select name="confirmed_payment" class="payment-select" style="margin-right: 10px;">
 					<?php foreach ($paymentOptions as $opt): ?>
-					<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid How? --'; ?></option>
+					<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?></option>
 					<?php endforeach; ?>
 				</select>
 				<button type="submit" name="confirm_add" class="btn-confirm">✅ Yes, Add New Name</button>
@@ -933,7 +1072,7 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 						<select name="payment_<?php echo md5($hasher); ?>" class="payment-select" onchange="this.form.querySelector('button[name=update_payment]').click();">
 							<?php foreach ($paymentOptions as $opt): ?>
 							<option value="<?php echo htmlspecialchars($opt); ?>" <?php echo ($payment == $opt) ? 'selected' : ''; ?>>
-								<?php echo $opt ? htmlspecialchars($opt) : '-- Paid --'; ?>
+								<?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?>
 							</option>
 							<?php endforeach; ?>
 						</select>
@@ -956,7 +1095,7 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 					<span class="hasher-name"><?php echo htmlspecialchars($hasher); ?></span>
 					<select name="payment_<?php echo md5($hasher); ?>" class="payment-select" onclick="event.stopPropagation();">
 						<?php foreach ($paymentOptions as $opt): ?>
-						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid --'; ?></option>
+						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?></option>
 						<?php endforeach; ?>
 					</select>
 					<button type="submit" name="toggle" value="<?php echo htmlspecialchars($hasher); ?>" style="display:none;"></button>
@@ -973,7 +1112,7 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 					<input type="text" name="new_hasher_name" placeholder="Enter your hash name..." value="<?php echo htmlspecialchars($newHasherName); ?>" style="flex: 1; min-width: 200px;">
 					<select name="new_payment" class="payment-select" style="margin-left: 0;">
 						<?php foreach ($paymentOptions as $opt): ?>
-						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Paid How? --'; ?></option>
+						<option value="<?php echo htmlspecialchars($opt); ?>"><?php echo $opt ? htmlspecialchars($opt) : '-- Unpaid --'; ?></option>
 						<?php endforeach; ?>
 					</select>
 					<button type="submit" name="add_new">Add & Check In</button>
