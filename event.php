@@ -15,6 +15,31 @@
 	// Include twilight calculator
 	require_once('twilight.php');
 	
+	// Rollcall data directory
+	define('ROLLCALL_DIR', '../../android/rollcall/');
+	
+	// Function to load attendance for an event
+	function loadEventAttendance($year, $month, $day, $no, $kennel) {
+		$kennelSafe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $kennel);
+		$file = ROLLCALL_DIR . sprintf("%d-%02d-%02d_%d_%s.txt", $year, $month, $day, $no, $kennelSafe);
+		
+		if (!file_exists($file)) {
+			return array();
+		}
+		
+		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+		$names = array();
+		foreach ($lines as $line) {
+			$parts = explode("\t", $line);
+			if (count($parts) >= 1 && !empty($parts[0])) {
+				$names[] = $parts[0];
+			}
+		}
+		
+		sort($names, SORT_STRING | SORT_FLAG_CASE);
+		return $names;
+	}
+	
 	$a = array(1=>0,2=>31,3=>59,4=>90,5=>120,6=>151,7=>181,8=>212,9=>243,10=>273,11=>304,12=>334);
 	$begin = 66;
 	$end = 304;
@@ -149,6 +174,16 @@
 			printf ("\t\t<h5><em>Description:</em> %s</h5>\n", $descriptionText);
 		} else {
 			printf ("\t\t<h5><em>Description:</em> Nothing yet</h5>\n");
+		}
+		
+		// Load and display check-ins
+		$kennel = isset($data[1]) ? trim($data[1]) : '';
+		$checkedInNames = loadEventAttendance($year, $month, $day, $no, $kennel);
+		if (count($checkedInNames) > 0) {
+			printf("\t\t<h5><em>Check-ins (%d):</em> %s</h5>\n", 
+				count($checkedInNames), 
+				htmlspecialchars(implode(', ', $checkedInNames))
+			);
 		}
 		
 		// Horizontal rule before action links

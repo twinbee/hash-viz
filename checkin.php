@@ -252,6 +252,60 @@ function hasherExists($name, $hashers) {
 }
 
 // ============================================
+// HELPER: Find similar names using soundex/metaphone
+// ============================================
+function findSimilarNames($newName, $existingNames, $limit = 5) {
+	$similar = array();
+	$newSoundex = soundex($newName);
+	$newMetaphone = metaphone($newName);
+	$newLower = strtolower($newName);
+	
+	foreach ($existingNames as $existing) {
+		$score = 0;
+		$existingLower = strtolower($existing);
+		
+		// Exact match (case insensitive)
+		if ($newLower == $existingLower) {
+			$score = 100;
+		}
+		// Soundex match
+		elseif (soundex($existing) == $newSoundex) {
+			$score = 70;
+		}
+		// Metaphone match
+		elseif (metaphone($existing) == $newMetaphone) {
+			$score = 60;
+		}
+		// Substring match
+		elseif (strpos($existingLower, $newLower) !== false || strpos($newLower, $existingLower) !== false) {
+			$score = 50;
+		}
+		// Levenshtein distance for short names
+		elseif (strlen($newName) < 20 && strlen($existing) < 20) {
+			$distance = levenshtein($newLower, $existingLower);
+			if ($distance <= 3) {
+				$score = 40 - ($distance * 10);
+			}
+		}
+		// First word match
+		else {
+			$newWords = explode(' ', $newLower);
+			$existingWords = explode(' ', $existingLower);
+			if ($newWords[0] == $existingWords[0] && strlen($newWords[0]) > 2) {
+				$score = 30;
+			}
+		}
+		
+		if ($score > 0) {
+			$similar[$existing] = $score;
+		}
+	}
+	
+	arsort($similar);
+	return array_slice(array_keys($similar), 0, $limit);
+}
+
+// ============================================
 // MAIN SCRIPT
 // ============================================
 
@@ -284,26 +338,64 @@ $rememberedName = isset($_COOKIE[COOKIE_NAME]) ? sanitizeHasherName($_COOKIE[COO
 // Handle actions
 $message = '';
 $messageType = 'success';
+$showSimilarNames = false;
+$similarNames = array();
+$pendingName = '';
 
 // Payment options
 $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	
-	// Handle setting/changing name
+	// Handle setting/changing name - initial request
 	if (isset($_POST['set_name'])) {
 		$newName = sanitizeHasherName($_POST['hasher_name']);
 		if (!empty($newName)) {
+			// Check if name already exists
+			if (hasherExists($newName, $hashers)) {
+				// Exact match - just set it
+				setcookie(COOKIE_NAME, $newName, time() + COOKIE_EXPIRY, '/');
+				$rememberedName = $newName;
+				$message = "Welcome back, " . htmlspecialchars($newName) . "!";
+			} else {
+				// Check for similar names
+				$similarNames = findSimilarNames($newName, $hashers);
+				if (count($similarNames) > 0) {
+					$showSimilarNames = true;
+					$pendingName = $newName;
+				} else {
+					// No similar names, add directly
+					setcookie(COOKIE_NAME, $newName, time() + COOKIE_EXPIRY, '/');
+					$rememberedName = $newName;
+					$hashers[] = $newName;
+					saveHashers($hashers);
+					$message = "Welcome, " . htmlspecialchars($newName) . "!";
+				}
+			}
+		}
+	}
+	
+	// Handle confirmed new name
+	if (isset($_POST['confirm_name'])) {
+		$newName = sanitizeHasherName($_POST['confirmed_name']);
+		if (!empty($newName)) {
 			setcookie(COOKIE_NAME, $newName, time() + COOKIE_EXPIRY, '/');
 			$rememberedName = $newName;
-			
-			// Add to hashers list if not exists
 			if (!hasherExists($newName, $hashers)) {
 				$hashers[] = $newName;
 				saveHashers($hashers);
 			}
-			
 			$message = "Welcome, " . htmlspecialchars($newName) . "!";
+		}
+	}
+	
+	// Handle selecting existing similar name
+	if (isset($_POST['use_existing'])) {
+		$existingName = sanitizeHasherName($_POST['existing_name']);
+		if (!empty($existingName) && hasherExists($existingName, $hashers)) {
+			setcookie(COOKIE_NAME, $existingName, time() + COOKIE_EXPIRY, '/');
+			$rememberedName = $existingName;
+			$message = "Welcome back, " . htmlspecialchars($existingName) . "!";
 		}
 	}
 	
@@ -687,7 +779,33 @@ $headCount = count($attendance);
 		<div class="label">Hashers Checked In</div>
 	</div>
 	
-	<?php if (empty($rememberedName)): ?>
+	<?php if ($showSimilarNames): ?>
+	<!-- Similar Names Confirmation -->
+	<div class="action-section" style="background: #fff3e0; border-color: #ff9800;">
+		<h3>🤔 Is this you?</h3>
+		<p>You entered: <strong><?php echo htmlspecialchars($pendingName); ?></strong></p>
+		<p>We found similar names already on the list:</p>
+		
+		<?php foreach ($similarNames as $similar): ?>
+		<form method="POST" style="margin-bottom: 10px;">
+			<input type="hidden" name="existing_name" value="<?php echo htmlspecialchars($similar); ?>">
+			<button type="submit" name="use_existing" class="btn btn-primary btn-block">
+				I'm "<?php echo htmlspecialchars($similar); ?>"
+			</button>
+		</form>
+		<?php endforeach; ?>
+		
+		<hr style="margin: 20px 0;">
+		<p>None of these? Add yourself as a new hasher:</p>
+		<form method="POST">
+			<input type="hidden" name="confirmed_name" value="<?php echo htmlspecialchars($pendingName); ?>">
+			<button type="submit" name="confirm_name" class="btn btn-secondary btn-block">
+				➕ Add "<?php echo htmlspecialchars($pendingName); ?>" as new
+			</button>
+		</form>
+	</div>
+	
+	<?php elseif (empty($rememberedName)): ?>
 	<!-- Set Name Form -->
 	<div class="action-section">
 		<h3>👋 Who Are You?</h3>
