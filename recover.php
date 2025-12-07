@@ -15,10 +15,11 @@ date_default_timezone_set('America/Chicago'); // Central Time for DFW
 // ============================================
 // CONFIGURATION
 // ============================================
-define('BACKUP_DIR', '../../android/backups/');
-define('DATA_DIR', '../../android/');
+// recover.php lives in calendar/, data is in android/
+define('BACKUP_DIR', '../android/backups/');
+define('DATA_DIR', '../android/');
 
-// Load users from separate file
+// Load users from same directory
 require_once('users.php');
 
 // ============================================

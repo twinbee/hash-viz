@@ -23,8 +23,8 @@ date_default_timezone_set('America/Chicago'); // Central Time for DFW
 
 define('EDITPHP_VERSION', '2.2');
 
-// Load users from separate file
-require_once('users.php');
+// Load users from separate file (in parent calendar/ directory)
+require_once('../users.php');
 
 define('BACKUP_DIR', '../../android/backups/');
 
