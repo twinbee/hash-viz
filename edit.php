@@ -670,6 +670,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	// Validate maplink URL
 	$maplink = validateUrl($_POST['maplink']);
 	
+	// Get RSVP setting
+	$rsvpEnabled = isset($_POST['rsvp_enabled']) ? '1' : '';
+	
 	// Build new event line
 	$newEventData = array(
 		$day,
@@ -687,7 +690,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		$twilight, // twilight
 		$autoDate,
 		$desc,
-		date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION
+		date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION,
+		$rsvpEnabled
 	);
 	$newEventLine = implode("\t", $newEventData);
 	
@@ -857,6 +861,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			// Validate maplink URL
 			$maplink = validateUrl($_POST['maplink']);
 			
+			// Get RSVP setting
+			$rsvpEnabled = isset($_POST['rsvp_enabled']) ? '1' : '';
+			
 			// Sanitize all fields to remove XSS while allowing safe HTML
 			$updatedData = array(
 				$day,
@@ -874,7 +881,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 				'',
 				$autoDate,
 				$desc,
-				date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION
+				date('n/j/y G:i') . ' (' . $_SESSION['username'] . ') ' . EDITPHP_VERSION,
+				$rsvpEnabled
 			);
 			$updatedLine = implode("\t", $updatedData);
 			$newLines[] = $updatedLine;
@@ -948,12 +956,13 @@ if (!$isNewEvent) {
 }
 
 //DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
-//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
+//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15 RSVP = 16
 
 $kennel = isset($data[1]) ? $data[1] : '';
 $dateDisplay = isset($data[13]) && strlen($data[13]) > 0 ? $data[13] : generateDateString($day, $month, $year);
 $currentIcon = isset($data[2]) ? trim($data[2]) : '';
 $currentTurds = isset($data[10]) ? trim($data[10]) : '';
+$currentRsvp = isset($data[16]) ? trim($data[16]) : '';
 
 // Get days in the selected month (for new event day selector)
 $daysInMonth = date('t', mktime(0, 0, 0, $month, 1, $year));
@@ -1364,6 +1373,14 @@ $nextNo = $no + 1;
 					<option value="A to A'" <?php echo ($currentTrailType == "A to A'") ? 'selected' : ''; ?>>A to A'</option>
 					<option value="A to B" <?php echo ($currentTrailType == 'A to B') ? 'selected' : ''; ?>>A to B</option>
 				</select>
+			</div>
+			
+			<div class="form-group">
+				<label class="checkbox-label" style="display: inline-flex; align-items: center; gap: 8px;">
+					<input type="checkbox" name="rsvp_enabled" value="1" <?php echo ($currentRsvp == '1') ? 'checked' : ''; ?>>
+					<span>✅ Allow early check-in (RSVP)</span>
+				</label>
+				<small style="display: block; color: #666; margin-top: 5px;">Removes time restriction so hashers can check in early as an RSVP.</small>
 			</div>
 			
 			<div class="form-group">

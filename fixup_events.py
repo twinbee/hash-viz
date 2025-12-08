@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-fixup.py - Batch Event File Editor
+fixup_events.py - Batch Event File Editor
 Modifies hash event data files by kennel and field
 """
 
@@ -8,26 +8,6 @@ import os
 import sys
 import glob
 from datetime import datetime
-
-# Field names and indices
-FIELDS = {
-    0: "DAY",
-    1: "KENNEL",
-    2: "TYPE/ICON",
-    3: "TITLE",
-    4: "RUN",
-    5: "HARES",
-    6: "TIME",
-    7: "ADDRESS",
-    8: "MAPLINK",
-    9: "HASHCASH",
-    10: "TURDS",
-    11: "TWEET",
-    12: "TWILIGHT",
-    13: "DATE",
-    14: "DESC",
-    15: "UPDATED"
-}
 
 def read_event_files(directory):
     """Read all .txt files in the directory"""
@@ -40,6 +20,20 @@ def read_event_files(directory):
     
     print(f"Found {len(files)} event file(s)")
     return sorted(files)
+
+def read_header(files):
+    """Read header from first file to get actual field names"""
+    if not files:
+        return None
+    
+    try:
+        with open(files[0], 'r', encoding='utf-8') as f:
+            header_line = f.readline().strip()
+            fields = header_line.split('\t')
+            return fields
+    except Exception as e:
+        print(f"Error reading header from {files[0]}: {e}")
+        return None
 
 def get_kennels_from_files(files):
     """Extract unique kennel names from all files"""
@@ -73,7 +67,7 @@ def display_menu(items, title):
             if choice == 0:
                 return None
             if 1 <= choice <= len(items):
-                return items[choice - 1]
+                return choice - 1  # Return the INDEX, not the item
             print("Invalid selection. Try again.")
         except ValueError:
             print("Please enter a number.")
@@ -182,7 +176,7 @@ def apply_changes(files, kennel, field_index, action, new_value):
 
 def main():
     print("=" * 70)
-    print("FIXUP.PY - Hash Event Batch Editor")
+    print("FIXUP_EVENTS.PY - Hash Event Batch Editor")
     print("=" * 70)
     
     # Step 1: Get directory
@@ -200,7 +194,18 @@ def main():
     if not files:
         return
     
-    # Step 3: Get available kennels
+    # Step 3: Read header from first file
+    header_fields = read_header(files)
+    if not header_fields:
+        print("Error: Could not read header from files")
+        return
+    
+    print(f"\nDetected {len(header_fields)} field(s) from file header:")
+    for idx, name in enumerate(header_fields):
+        field_name = name if name else f"(unlabeled field {idx})"
+        print(f"  {idx}: {field_name}")
+    
+    # Step 4: Get available kennels
     kennels = get_kennels_from_files(files)
     if not kennels:
         print("No kennels found in files")
@@ -208,32 +213,37 @@ def main():
     
     print(f"\nFound {len(kennels)} unique kennel(s)")
     
-    # Step 4: Select kennel
-    kennel = display_menu(kennels, "SELECT KENNEL")
-    if kennel is None:
+    # Step 5: Select kennel
+    kennel_index = display_menu(kennels, "SELECT KENNEL")
+    if kennel_index is None:
+        print("Cancelled.")
+        return
+    kennel = kennels[kennel_index]
+    
+    # Step 6: Select field
+    field_display = []
+    for idx, name in enumerate(header_fields):
+        field_name = name if name else f"(unlabeled)"
+        field_display.append(f"Field {idx}: {field_name}")
+    
+    field_choice_index = display_menu(field_display, "SELECT FIELD TO MODIFY")
+    if field_choice_index is None:
         print("Cancelled.")
         return
     
-    # Step 5: Select field
-    field_list = [f"{idx}: {name}" for idx, name in sorted(FIELDS.items())]
-    field_choice = display_menu(field_list, "SELECT FIELD TO MODIFY")
-    if field_choice is None:
+    field_index = field_choice_index
+    field_name = header_fields[field_index] if header_fields[field_index] else f"(unlabeled field {field_index})"
+    
+    # Step 7: Select action
+    actions = ["Replace (overwrite existing)", "Append (add to end)"]
+    action_index = display_menu(actions, "SELECT ACTION")
+    if action_index is None:
         print("Cancelled.")
         return
     
-    field_index = int(field_choice.split(':')[0])
-    field_name = FIELDS[field_index]
+    action_type = "replace" if action_index == 0 else "append"
     
-    # Step 6: Select action
-    action = display_menu(["Replace (overwrite existing)", "Append (add to end)"], 
-                         "SELECT ACTION")
-    if action is None:
-        print("Cancelled.")
-        return
-    
-    action_type = "replace" if "Replace" in action else "append"
-    
-    # Step 7: Get new value
+    # Step 8: Get new value
     print(f"\nEnter new value to {action_type} for field '{field_name}':")
     new_value = input("> ")
     
@@ -243,17 +253,17 @@ def main():
             print("Cancelled.")
             return
     
-    # Step 8: Preview changes
+    # Step 9: Preview changes
     total = preview_changes(files, kennel, field_index, action_type, new_value)
     
     if total == 0:
         print("\nNo matching events found.")
         return
     
-    # Step 9: Confirm
+    # Step 10: Confirm
     print(f"\nReady to modify {total} event(s) in {len(files)} file(s)")
     print(f"Kennel: {kennel}")
-    print(f"Field: {field_name}")
+    print(f"Field {field_index}: {field_name}")
     print(f"Action: {action_type.upper()}")
     print(f"Value: {new_value if new_value else '(empty)'}")
     
@@ -262,7 +272,7 @@ def main():
         print("Cancelled.")
         return
     
-    # Step 10: Apply changes
+    # Step 11: Apply changes
     print("\nApplying changes...")
     modified = apply_changes(files, kennel, field_index, action_type, new_value)
     

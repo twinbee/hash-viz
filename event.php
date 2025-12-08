@@ -62,12 +62,15 @@
 				exit;
 		}
 		
+		// First pass: collect all events to find prev/next
+		$allEvents = array();
+		$currentEventIndex = -1;
+		$lineIndex = 0;
+		
 		while ($line = fgets ($file, 8192)) {
-			$data = explode("\t", $line);
-			//DAY = 0 KENNEL = 1 TYPE = 2 TITLE = 3 RUN = 4 HARES = 5 TIME = 6 ADDRESS = 7 
-			//MAPLINK = 8 HASHCASH = 9 TURDS = 10 TWEET = 11 TWILIGHT = 12 DATE = 13 DESC = 14 UPDATED = 15
-
-			$d = $data[0];			
+			$lineData = explode("\t", $line);
+			$d = isset($lineData[0]) ? $lineData[0] : '';
+			
 			if ($d != $lastDay) {
 				$n = 1;
 			} else {
@@ -75,7 +78,24 @@
 			}
 			$lastDay = $d;
 			
-			if ( $d == $day && $n == $no) break;
+			$allEvents[] = array('day' => $d, 'no' => $n, 'line' => $lineIndex, 'data' => $lineData);
+			
+			if ($d == $day && $n == $no) {
+				$currentEventIndex = count($allEvents) - 1;
+				$data = $lineData;
+			}
+			$lineIndex++;
+		}
+		fclose($file);
+		
+		// Find prev/next events
+		$prevEvent = null;
+		$nextEvent = null;
+		if ($currentEventIndex > 0) {
+			$prevEvent = $allEvents[$currentEventIndex - 1];
+		}
+		if ($currentEventIndex >= 0 && $currentEventIndex < count($allEvents) - 1) {
+			$nextEvent = $allEvents[$currentEventIndex + 1];
 		}
 	  
 		$data[6] = str_replace("CDT", "", str_replace("CST", "", $data[6])); // lops off CDT or CST
@@ -126,7 +146,7 @@
 		print("\t<div id=\"container\">\n");
 		
 		// Generate back to calendar link for specific month
-		$calendarMonthLink = sprintf('$%d-%d.php', $month, $year);
+		$calendarMonthLink = sprintf('$%02d-%d.php', $month, $year);
 		
 		// Navigation link back to calendar
 		printf("\t\t<p class=\"nav-links\"><a href=\"%s\">&laquo; Back to Calendar</a></p>\n", $calendarMonthLink);
@@ -189,11 +209,57 @@
 			);
 		}
 		
+		// Check if early check-in (RSVP) is enabled (field 16)
+		$earlyCheckinEnabled = isset($data[16]) && trim($data[16]) == '1';
+		
+		// Show early check-in notice if enabled
+		if ($earlyCheckinEnabled) {
+			printf("\t\t<h5><em>📋 Early check-in is open - use check-in to RSVP!</em></h5>\n");
+		}
+		
 		// Horizontal rule before action links
 		printf("\t\t<hr />\n");
 		
+		// Generate prev/next event links
+		$prevEventLink = null;
+		$nextEventLink = null;
+		$prevEventLabel = null;
+		$nextEventLabel = null;
+		
+		if ($prevEvent) {
+			$prevEventLink = sprintf(
+				'event.php?year=%d&month=%d&day=%d&no=%d',
+				$year, $month, $prevEvent['day'], $prevEvent['no']
+			);
+			$prevKennel = isset($prevEvent['data'][1]) ? trim($prevEvent['data'][1]) : '';
+			$prevEventLabel = sprintf('%s/%d %s', $month, $prevEvent['day'], $prevKennel);
+		}
+		
+		if ($nextEvent) {
+			$nextEventLink = sprintf(
+				'event.php?year=%d&month=%d&day=%d&no=%d',
+				$year, $month, $nextEvent['day'], $nextEvent['no']
+			);
+			$nextKennel = isset($nextEvent['data'][1]) ? trim($nextEvent['data'][1]) : '';
+			$nextEventLabel = sprintf('%s/%d %s', $month, $nextEvent['day'], $nextKennel);
+		}
+		
+		// Add prev/next navigation
+		printf("\t\t<p style=\"margin-top: 15px; display: flex; justify-content: space-between; align-items: center;\">\n");
+		if ($prevEventLink) {
+			printf("\t\t\t<a href=\"%s\" style=\"text-decoration: none;\">◀ %s</a>\n", $prevEventLink, htmlspecialchars($prevEventLabel));
+		} else {
+			printf("\t\t\t<span style=\"color: #ccc;\">◀ Previous</span>\n");
+		}
+		if ($nextEventLink) {
+			printf("\t\t\t<a href=\"%s\" style=\"text-decoration: none;\">%s ▶</a>\n", $nextEventLink, htmlspecialchars($nextEventLabel));
+		} else {
+			printf("\t\t\t<span style=\"color: #ccc;\">Next ▶</span>\n");
+		}
+		printf("\t\t</p>\n");
+		
 		// Generate back to calendar link for specific month
-		$calendarMonthLink = sprintf('$%d-%d.php', $month, $year);
+		$calendarMonthLink = sprintf('$%02d-%d.php', $month, $year);
 		
 		// Generate rollcall link
 		$rollcallLink = sprintf(
@@ -212,7 +278,7 @@
 		printf("\t\t\t<a href=\"%s\">edit</a> | \n", $editLink);
 		printf("\t\t\t<a href=\"%s\">check in</a> | \n", $checkinLink);
 		printf("\t\t\t<a href=\"%s\">roll call</a> | \n", $rollcallLink);
-		printf("\t\t\t<a href=\"%s\">download calendar invite</a> | \n", $calendarLink);
+		printf("\t\t\t<a href=\"%s\">download invite</a> | \n", $calendarLink);
 		printf("\t\t\t<a href=\"%s\">back to calendar</a>\n", $calendarMonthLink);
 		printf("\t\t</p>\n");
 		

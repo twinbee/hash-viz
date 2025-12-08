@@ -100,23 +100,38 @@ function getEventTimestamp($year, $month, $day, $timeStr) {
 // ============================================
 // HELPER: Get checkin window info
 // ============================================
-function getCheckinWindowInfo($year, $month, $day, $timeStr, $testingMode = false) {
+function getCheckinWindowInfo($year, $month, $day, $timeStr, $testingMode = false, $earlyCheckinEnabled = false) {
 	$eventTime = getEventTimestamp($year, $month, $day, $timeStr);
 	$now = time();
+	
+	// If early check-in (RSVP) is enabled, window is always open
+	if ($earlyCheckinEnabled || $testingMode) {
+		return array(
+			'eventTime' => $eventTime,
+			'windowStart' => null,
+			'windowEnd' => null,
+			'isOpen' => true,
+			'isBefore' => false,
+			'isAfter' => false,
+			'testingMode' => $testingMode,
+			'earlyCheckin' => $earlyCheckinEnabled
+		);
+	}
 	
 	$windowStart = $eventTime - (10 * 60);
 	$windowEnd = $eventTime + (4 * 60 * 60);
 	
-	$isOpen = $testingMode || ($now >= $windowStart && $now <= $windowEnd);
+	$isOpen = ($now >= $windowStart && $now <= $windowEnd);
 	
 	return array(
 		'eventTime' => $eventTime,
 		'windowStart' => $windowStart,
 		'windowEnd' => $windowEnd,
 		'isOpen' => $isOpen,
-		'isBefore' => !$testingMode && ($now < $windowStart),
-		'isAfter' => !$testingMode && ($now > $windowEnd),
-		'testingMode' => $testingMode
+		'isBefore' => ($now < $windowStart),
+		'isAfter' => ($now > $windowEnd),
+		'testingMode' => $testingMode,
+		'earlyCheckin' => false
 	);
 }
 
@@ -176,7 +191,8 @@ function loadAttendance($year, $month, $day, $no, $kennel) {
 		if (count($parts) >= 2) {
 			$attendance[$parts[0]] = array(
 				'timestamp' => $parts[1],
-				'payment' => isset($parts[2]) ? $parts[2] : ''
+				'payment' => isset($parts[2]) ? $parts[2] : '',
+				'comment' => isset($parts[3]) ? $parts[3] : ''
 			);
 		}
 	}
@@ -197,9 +213,11 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 	$lines = array();
 	foreach ($attendance as $name => $data) {
 		if (is_array($data)) {
-			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . (isset($data['payment']) ? $data['payment'] : '');
+			$payment = isset($data['payment']) ? $data['payment'] : '';
+			$comment = isset($data['comment']) ? $data['comment'] : '';
+			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . $payment . "\t" . $comment;
 		} else {
-			$lines[] = $name . "\t" . $data . "\t";
+			$lines[] = $name . "\t" . $data . "\t\t";
 		}
 	}
 	
@@ -414,8 +432,11 @@ $eventTitle = isset($eventData[3]) ? trim($eventData[3]) : '';
 $eventTime = isset($eventData[6]) ? trim($eventData[6]) : '6:00 PM';
 $eventDate = isset($eventData[13]) ? trim($eventData[13]) : '';
 
+// Check if early check-in (RSVP) is enabled - field 16
+$earlyCheckinEnabled = isset($eventData[16]) && trim($eventData[16]) == '1';
+
 // Get checkin window info
-$windowInfo = getCheckinWindowInfo($year, $month, $day, $eventTime, $TESTING_MODE);
+$windowInfo = getCheckinWindowInfo($year, $month, $day, $eventTime, $TESTING_MODE, $earlyCheckinEnabled);
 
 // Load hashers and attendance
 $hashers = loadHashers();
@@ -491,19 +512,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	// Handle check-in
 	if (isset($_POST['checkin']) && !empty($rememberedName)) {
 		$paymentMethod = isset($_POST['payment']) ? $_POST['payment'] : '';
+		$comment = isset($_POST['comment']) ? sanitizeHasherName($_POST['comment']) : '';
 		
 		if ($windowInfo['isOpen']) {
 			if (!isset($attendance[$rememberedName])) {
 				$attendance[$rememberedName] = array(
 					'timestamp' => date('Y-m-d H:i:s'),
-					'payment' => $paymentMethod
+					'payment' => $paymentMethod,
+					'comment' => $comment
 				);
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 				updateTally($rememberedName, $kennel, 1);
 				$message = "You're checked in! 🎉";
 			} else {
-				// Update payment method
+				// Update payment method and comment
 				$attendance[$rememberedName]['payment'] = $paymentMethod;
+				$attendance[$rememberedName]['comment'] = $comment;
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 				$message = "Payment method updated!";
 			}
@@ -534,6 +558,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Check if user is checked in
 $isCheckedIn = !empty($rememberedName) && isset($attendance[$rememberedName]);
 $currentPayment = $isCheckedIn && is_array($attendance[$rememberedName]) ? $attendance[$rememberedName]['payment'] : '';
+$currentComment = $isCheckedIn && is_array($attendance[$rememberedName]) ? $attendance[$rememberedName]['comment'] : '';
 
 // Get user stats
 $userStats = !empty($rememberedName) ? getHasherStats($rememberedName) : null;
@@ -944,6 +969,10 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 	<div class="window-status window-test">
 		🧪 TESTING MODE - CHECK-IN ALWAYS OPEN
 	</div>
+	<?php elseif ($windowInfo['earlyCheckin']): ?>
+	<div class="window-status window-open">
+		✅ EARLY CHECK-IN OPEN (RSVP)
+	</div>
 	<?php elseif ($windowInfo['isOpen']): ?>
 	<div class="window-status window-open">
 		✅ CHECK-IN IS OPEN
@@ -1033,6 +1062,10 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 		<!-- Already checked in - show update form -->
 		<form method="POST">
 			<div class="form-group">
+				<label>📝 Comment:</label>
+				<input type="text" name="comment" value="<?php echo htmlspecialchars($currentComment); ?>" placeholder="Bringing a virgin, need a ride, etc..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
+			</div>
+			<div class="form-group">
 				<label>💵 Paid How?</label>
 				<select name="payment">
 					<?php foreach ($paymentOptions as $opt): ?>
@@ -1042,7 +1075,7 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 					<?php endforeach; ?>
 				</select>
 			</div>
-			<button type="submit" name="checkin" class="btn btn-primary btn-block">💾 Update Payment</button>
+			<button type="submit" name="checkin" class="btn btn-primary btn-block">💾 Update</button>
 			<button type="submit" name="checkout" class="btn btn-danger btn-block" style="margin-top: 10px;">❌ Check Out</button>
 		</form>
 		<?php endif; ?>
@@ -1053,8 +1086,13 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 	<div id="paymentModal" class="modal">
 		<div class="modal-content">
 			<h3>💵 How are you paying?</h3>
-			<p style="color: #666; margin-bottom: 20px;">Please select your payment method</p>
+			<p style="color: #666; margin-bottom: 15px;">Please select your payment method</p>
 			<form method="POST" id="checkinForm">
+				<div style="margin-bottom: 15px;">
+					<label style="display: block; font-size: 14px; color: #666; margin-bottom: 5px;">📝 Comment (optional):</label>
+					<input type="text" name="comment" id="commentField" placeholder="Bringing a virgin, need a ride, etc..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
+				</div>
+				<hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
 				<?php foreach ($paymentOptions as $opt): ?>
 				<?php if ($opt === ''): ?>
 				<button type="submit" name="checkin" class="btn btn-block btn-unpaid" onclick="document.getElementById('paymentField').value='';">

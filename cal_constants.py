@@ -26,21 +26,24 @@ KENNEL_SPECS = {
     #"YAKH3": {"initial_date": datetime(2026, 4, 18), "run_number": 1}, 
     #"YakH3-HH": {"initial_date": datetime(2026, 6, 4), "run_number": 1},
     #"Grapevine Quarterly Hash": {"initial_date": datetime(2026, 3, 13), "run_number": 1},
-    "Full Moon Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 87},
+    #"Full Moon Hash": {"initial_date": datetime(2026, 1, 3), "run_number": 87},
     #"7-ELEVEn hash house harriers": {"initial_date": datetime(2026, 7, 11), "run_number": 711}
+    #"NO-NO-DUH": {"initial_date": datetime(2026, 1, 19), "run_number": 17}, 
+    "NODUH Hash": {"initial_date": datetime(2026, 1, 12), "run_number":335}, 
 }
 
 # Hashcash and schedule rules for each kennel
 KENNEL_RULES = {
-    "Dallas Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$10.00 - Pay Online: Paypal $10", "day": "Saturday"},
-    "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
-    "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
-    "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
-    "YAKH3": {"frequency": "yakh3-summer", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
-    "YakH3-HH": {"frequency": "yakh3hh-summer", "time": "7:00 PM", "hashcash": "", "day": "Friday"},
-    "Grapevine Quarterly Hash": {"frequency": "gqh-quarterly", "time": "7:00 PM", "hashcash": "", "day": "irrelevant"},
-    "Full Moon Hash": {"frequency": "full-moon", "time": "7:00 PM", "hashcash": "", "day": "full-moon"},
-    "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"}
+    # "Dallas Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$10.00 - Pay Online: Paypal $10", "day": "Saturday"},
+    # "Ft Worth Hash": {"frequency": "bi-weekly", "time": "2:00 PM", "hashcash": "$7.00 cash - Paypal $7 - Pay pal (FWH3) or Zelle 817-689-9363 - BYOB pre-lube beer", "day": "Saturday"},
+    # "Dallas Urban Hash": {"frequency": "weekly", "time": "6:30 PM", "hashcash": "", "day": "Wednesday"},
+    # "NO-NO-DUH": {"frequency": "monthly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
+    # "YAKH3": {"frequency": "yakh3-summer", "time": "12:00 PM", "hashcash": "", "day": "Sunday"}, 
+    # "YakH3-HH": {"frequency": "yakh3hh-summer", "time": "7:00 PM", "hashcash": "", "day": "Friday"},
+    # "Grapevine Quarterly Hash": {"frequency": "gqh-quarterly", "time": "7:00 PM", "hashcash": "", "day": "irrelevant"},
+    # "Full Moon Hash": {"frequency": "full-moon", "time": "7:00 PM", "hashcash": "", "day": "full-moon"},
+    # "7-ELEVEn hash house harriers": {"frequency": "fixed-dates", "time": "7:00 PM", "hashcash": "$7.11", "day": "irrelevant"},
+    "NODUH Hash": {"frequency": "bi-weekly", "time": "7:00 PM", "hashcash": "$7.00", "day": "Monday"}, 
 }
 
 # Helper dictionary to map rule["day"] name to Python's weekday() (0=Mon, 6=Sun)
@@ -60,6 +63,7 @@ def get_full_moon_icon(month):
 # Storing the icon information for each kennel
 KENNEL_ICONS = {
     "Dallas Urban Hash": "DUH.png",
+    "NODUH Hash": "NoDHHH2.png", 
     "NO-NO-DUH": "nonoduh.png", 
     "Dallas Hash": "dallas.png",
     "Ft Worth Hash": "ftworth.png",
