@@ -1734,7 +1734,7 @@ $nextNo = $no + 1;
 						'Glowsticks', 'Virgins', 'On-In $', 'Bug Spray',
 						'Swimsuit', 'Birthday Suit', 'DART', 'Pre-lube',
 						'Leash', 'Trash Bags', 'BYOB', 'BYOE',
-						'Vessel', 'Bowl/Spoon', 'Cash'
+						'Vessel', 'Bowl/Spoon', 'Cash', 'Side Dish', 'Chair'
 					);
 					
 					// Parse existing bring items from description
