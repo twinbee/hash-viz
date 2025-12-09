@@ -153,6 +153,16 @@ function verify_password($password, $hash) {
 	return md5($password) === $hash;
 }
 
+// ============================================
+// VALIDATION: Time field format
+// Must start with "H:MM AM" or "H:MM PM" for EditHash 1.28 compatibility
+// ============================================
+function validateTimeFormat($time) {
+	// Pattern: 1-2 digit hour, colon, 2 digit minute, space, AM or PM
+	// Followed by optional space and additional text
+	return preg_match('/^\d{1,2}:\d{2}\s*(AM|PM)/i', $time);
+}
+
 session_start();
 
 // Regenerate session ID on login to prevent session fixation
@@ -387,6 +397,74 @@ function getIconFiles($year) {
 	return $icons;
 }
 
+// ============================================
+// EDIT LOCK SYSTEM - Track who is editing what
+// ============================================
+define('LOCK_DIR', dirname(__FILE__) . '/locks');
+define('LOCK_TIMEOUT', 1800); // 30 minutes - matches session timeout
+
+function getLockFile($year, $month, $day, $no) {
+	return LOCK_DIR . '/' . sprintf('%d-%02d-%02d-%d.lock', $year, $month, $day, $no);
+}
+
+function acquireEditLock($year, $month, $day, $no, $username) {
+	// Create lock directory if needed
+	if (!is_dir(LOCK_DIR)) {
+		mkdir(LOCK_DIR, 0755, true);
+	}
+	
+	$lockFile = getLockFile($year, $month, $day, $no);
+	$lockData = array(
+		'user' => $username,
+		'time' => time(),
+		'timestamp' => date('Y-m-d H:i:s')
+	);
+	
+	file_put_contents($lockFile, serialize($lockData), LOCK_EX);
+	return true;
+}
+
+function getEditLock($year, $month, $day, $no) {
+	$lockFile = getLockFile($year, $month, $day, $no);
+	
+	if (!file_exists($lockFile)) {
+		return null;
+	}
+	
+	$lockData = unserialize(file_get_contents($lockFile));
+	
+	// Check if lock has expired
+	if (time() - $lockData['time'] > LOCK_TIMEOUT) {
+		releaseEditLock($year, $month, $day, $no);
+		return null;
+	}
+	
+	return $lockData;
+}
+
+function releaseEditLock($year, $month, $day, $no) {
+	$lockFile = getLockFile($year, $month, $day, $no);
+	if (file_exists($lockFile)) {
+		unlink($lockFile);
+	}
+}
+
+function refreshEditLock($year, $month, $day, $no, $username) {
+	$lockFile = getLockFile($year, $month, $day, $no);
+	
+	if (file_exists($lockFile)) {
+		$lockData = unserialize(file_get_contents($lockFile));
+		// Only refresh if we own the lock
+		if ($lockData['user'] === $username) {
+			$lockData['time'] = time();
+			$lockData['timestamp'] = date('Y-m-d H:i:s');
+			file_put_contents($lockFile, serialize($lockData), LOCK_EX);
+			return true;
+		}
+	}
+	return false;
+}
+
 // Include twilight calculator
 require_once('twilight.php');
 
@@ -497,6 +575,48 @@ $isNewEvent = ($no == 0 || (isset($_GET['action']) && $_GET['action'] == 'new'))
 $message = "";
 $messageType = "";
 $backupCreated = "";
+
+// ============================================
+// EDIT LOCK HANDLING
+// ============================================
+$editLockWarning = '';
+$currentLock = null;
+
+// Handle lock refresh via AJAX
+if (isset($_GET['refresh_lock']) && !$isNewEvent) {
+	header('Content-Type: application/json');
+	$refreshed = refreshEditLock($year, $month, $day, $no, $_SESSION['username']);
+	echo json_encode(array('success' => $refreshed, 'remaining' => LOCK_TIMEOUT));
+	exit;
+}
+
+// Handle explicit lock release
+if (isset($_GET['release_lock']) && !$isNewEvent) {
+	$currentLock = getEditLock($year, $month, $day, $no);
+	if ($currentLock && $currentLock['user'] === $_SESSION['username']) {
+		releaseEditLock($year, $month, $day, $no);
+	}
+	// Redirect back to calendar
+	header('Location: $' . sprintf('%02d-%d.php', $month, $year));
+	exit;
+}
+
+// Check for existing lock when editing (not new events)
+if (!$isNewEvent) {
+	$currentLock = getEditLock($year, $month, $day, $no);
+	
+	if ($currentLock && $currentLock['user'] !== $_SESSION['username']) {
+		// Someone else is editing
+		$editLockWarning = sprintf(
+			'⚠️ Currently being edited by <strong>%s</strong> (started %s)',
+			htmlspecialchars($currentLock['user']),
+			htmlspecialchars($currentLock['timestamp'])
+		);
+	} else {
+		// Acquire or refresh our lock
+		acquireEditLock($year, $month, $day, $no, $_SESSION['username']);
+	}
+}
 
 // Get available icons for dropdown
 $availableIcons = getIconFiles($year);
@@ -719,6 +839,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
 		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
+	// Validate time format for EditHash 1.28 compatibility
+	} else if (!empty($_POST['time']) && !validateTimeFormat($_POST['time'])) {
+		$message = "Time must start with format \"H:MM AM\" or \"H:MM PM\" (e.g., \"7:00 PM\" or \"2:00 PM Trail starts\") for compatibility with EditHash 1.28 app.";
+		$messageType = "error";
 	} else {
 		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 		
@@ -892,6 +1016,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
 		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
+	// Validate time format for EditHash 1.28 compatibility
+	} else if (!empty($_POST['time']) && !validateTimeFormat($_POST['time'])) {
+		$message = "Time must start with format \"H:MM AM\" or \"H:MM PM\" (e.g., \"7:00 PM\" or \"2:00 PM Trail starts\") for compatibility with EditHash 1.28 app.";
+		$messageType = "error";
 	} else {
 		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
 		
@@ -1033,6 +1161,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 	if ($targetLineIndex >= 0) {
 		$result = file_put_contents($filename, implode("\n", $newLines));
 		if ($result !== false) {
+			// Release edit lock
+			releaseEditLock($year, $month, $day, $no);
 			$eventUrl = sprintf(
 				'event.php?year=%d&month=%d&day=%d&no=%d',
 				$year, $month, $day, $no
@@ -1245,6 +1375,62 @@ $nextNo = $no + 1;
 	<script>
 	var formChanged = false;
 	
+	// Session timeout countdown
+	var sessionTimeout = <?php echo LOCK_TIMEOUT; ?>; // 30 minutes in seconds
+	var sessionStart = <?php echo time(); ?>;
+	var isNewEvent = <?php echo $isNewEvent ? 'true' : 'false'; ?>;
+	
+	function updateSessionTimer() {
+		var elapsed = Math.floor(Date.now() / 1000) - sessionStart;
+		var remaining = sessionTimeout - elapsed;
+		
+		if (remaining <= 0) {
+			document.getElementById('sessionTimer').innerHTML = '<span style="color: #d9534f;">Session expired - please refresh</span>';
+			return;
+		}
+		
+		var minutes = Math.floor(remaining / 60);
+		var seconds = remaining % 60;
+		var display = minutes + ':' + (seconds < 10 ? '0' : '') + seconds;
+		
+		var timerEl = document.getElementById('sessionTimer');
+		if (timerEl) {
+			// Show warning color when under 5 minutes
+			if (remaining < 300) {
+				timerEl.innerHTML = '<span style="color: #d9534f;">⏱️ ' + display + '</span>';
+			} else {
+				timerEl.innerHTML = '⏱️ ' + display;
+			}
+		}
+	}
+	
+	// Refresh the edit lock periodically (every 5 minutes)
+	function refreshLock() {
+		if (isNewEvent) return;
+		
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', window.location.pathname + '?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>&refresh_lock=1', true);
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState === 4 && xhr.status === 200) {
+				// Lock refreshed - reset session timer
+				sessionStart = Math.floor(Date.now() / 1000);
+			}
+		};
+		xhr.send();
+	}
+	
+	// Start timers when page loads
+	window.onload = function() {
+		// Update session timer every second
+		setInterval(updateSessionTimer, 1000);
+		updateSessionTimer();
+		
+		// Refresh lock every 5 minutes
+		if (!isNewEvent) {
+			setInterval(refreshLock, 300000);
+		}
+	};
+	
 	function updateIconPreview() {
 		var select = document.getElementById('iconSelect');
 		var preview = document.getElementById('iconPreview');
@@ -1305,10 +1491,20 @@ $nextNo = $no + 1;
 		</div>
 		
 		<div class="header">
-			<div class="user-info">Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong></div>
+			<div class="user-info">
+				Logged in as: <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong>
+				<span id="sessionTimer" style="margin-left: 15px; color: #666;"></span>
+			</div>
 			<h1 style="clear: both;"><?php echo $formTitle; ?></h1>
 			<a href="?logout=1" class="btn btn-logout">Logout</a>
 		</div>
+		
+		<?php if (!empty($editLockWarning)): ?>
+		<div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+			<?php echo $editLockWarning; ?>
+			<br><small>You can still edit, but be aware your changes may conflict with theirs.</small>
+		</div>
+		<?php endif; ?>
 		
 		<?php if ($isNewEvent): ?>
 		<div class="new-event-banner">
@@ -1450,7 +1646,8 @@ $nextNo = $no + 1;
 			
 			<div class="form-group">
 				<label>Time:</label>
-				<input type="text" name="time" value="<?php echo htmlspecialchars(isset($data[6]) ? $data[6] : '7:00 PM'); ?>">
+				<input type="text" name="time" value="<?php echo htmlspecialchars(isset($data[6]) ? $data[6] : '7:00 PM'); ?>" placeholder="7:00 PM">
+				<small style="color: #666;">Must start with "H:MM AM" or "H:MM PM" (e.g., "7:00 PM" or "2:00 PM Trail starts"). Required for EditHash 1.28 compatibility.</small>
 			</div>
 			
 			<div class="form-group">
