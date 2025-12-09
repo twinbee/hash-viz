@@ -35,6 +35,51 @@ function sanitizeHasherName($name) {
 }
 
 // ============================================
+// SECURITY: Sanitize comments (with length limit)
+// ============================================
+define('MAX_COMMENT_LENGTH', 128);
+
+function sanitizeComment($comment) {
+	// Remove null bytes
+	$comment = str_replace(chr(0), '', $comment);
+	// Remove script tags
+	$comment = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $comment);
+	// Remove javascript: protocol
+	$comment = preg_replace('/javascript\s*:/i', '', $comment);
+	// Remove on* event handlers
+	$comment = preg_replace('/\bon\w+\s*=/i', '', $comment);
+	// Remove all HTML tags
+	$comment = preg_replace('/<[^>]*>/', '', $comment);
+	// Remove tabs and newlines (could break TSV format)
+	$comment = preg_replace('/[\t\r\n]/', ' ', $comment);
+	// Trim whitespace
+	$comment = trim($comment);
+	// Enforce max length
+	if (strlen($comment) > MAX_COMMENT_LENGTH) {
+		$comment = substr($comment, 0, MAX_COMMENT_LENGTH);
+	}
+	return $comment;
+}
+
+// ============================================
+// HELPER: Get client IP address
+// ============================================
+function getClientIP() {
+	// Check for proxy headers first
+	if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+		$ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+		return trim($ips[0]);
+	}
+	if (!empty($_SERVER['HTTP_X_REAL_IP'])) {
+		return $_SERVER['HTTP_X_REAL_IP'];
+	}
+	if (!empty($_SERVER['HTTP_CLIENT_IP'])) {
+		return $_SERVER['HTTP_CLIENT_IP'];
+	}
+	return isset($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : '';
+}
+
+// ============================================
 // HELPER: Get event info from data file
 // ============================================
 function getEventInfo($year, $month, $day, $no) {
@@ -192,7 +237,8 @@ function loadAttendance($year, $month, $day, $no, $kennel) {
 			$attendance[$parts[0]] = array(
 				'timestamp' => $parts[1],
 				'payment' => isset($parts[2]) ? $parts[2] : '',
-				'comment' => isset($parts[3]) ? $parts[3] : ''
+				'comment' => isset($parts[3]) ? $parts[3] : '',
+				'ip' => isset($parts[4]) ? $parts[4] : ''
 			);
 		}
 	}
@@ -215,9 +261,10 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 		if (is_array($data)) {
 			$payment = isset($data['payment']) ? $data['payment'] : '';
 			$comment = isset($data['comment']) ? $data['comment'] : '';
-			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . $payment . "\t" . $comment;
+			$ip = isset($data['ip']) ? $data['ip'] : '';
+			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . $payment . "\t" . $comment . "\t" . $ip;
 		} else {
-			$lines[] = $name . "\t" . $data . "\t\t";
+			$lines[] = $name . "\t" . $data . "\t\t\t";
 		}
 	}
 	
@@ -512,22 +559,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 	// Handle check-in
 	if (isset($_POST['checkin']) && !empty($rememberedName)) {
 		$paymentMethod = isset($_POST['payment']) ? $_POST['payment'] : '';
-		$comment = isset($_POST['comment']) ? sanitizeHasherName($_POST['comment']) : '';
+		$comment = isset($_POST['comment']) ? sanitizeComment($_POST['comment']) : '';
+		$clientIP = getClientIP();
 		
 		if ($windowInfo['isOpen']) {
 			if (!isset($attendance[$rememberedName])) {
 				$attendance[$rememberedName] = array(
 					'timestamp' => date('Y-m-d H:i:s'),
 					'payment' => $paymentMethod,
-					'comment' => $comment
+					'comment' => $comment,
+					'ip' => $clientIP
 				);
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 				updateTally($rememberedName, $kennel, 1);
 				$message = "You're checked in! 🎉";
 			} else {
-				// Update payment method and comment
+				// Update payment method, comment, and IP
 				$attendance[$rememberedName]['payment'] = $paymentMethod;
 				$attendance[$rememberedName]['comment'] = $comment;
+				$attendance[$rememberedName]['ip'] = $clientIP;
 				saveAttendance($year, $month, $day, $no, $kennel, $attendance);
 				$message = "Payment method updated!";
 			}
@@ -1063,7 +1113,7 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 		<form method="POST">
 			<div class="form-group">
 				<label>📝 Comment:</label>
-				<input type="text" name="comment" value="<?php echo htmlspecialchars($currentComment); ?>" placeholder="Bringing a virgin, need a ride, etc..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
+				<input type="text" name="comment" value="<?php echo htmlspecialchars($currentComment); ?>" placeholder="Bringing a virgin, need a ride, etc..." maxlength="128" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
 			</div>
 			<div class="form-group">
 				<label>💵 Paid How?</label>
@@ -1090,7 +1140,7 @@ $maxCount = count($topHashers) > 0 ? max($topHashers) : 1;
 			<form method="POST" id="checkinForm">
 				<div style="margin-bottom: 15px;">
 					<label style="display: block; font-size: 14px; color: #666; margin-bottom: 5px;">📝 Comment (optional):</label>
-					<input type="text" name="comment" id="commentField" placeholder="Bringing a virgin, need a ride, etc..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
+					<input type="text" name="comment" id="commentField" placeholder="Bringing a virgin, need a ride, etc..." maxlength="128" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;">
 				</div>
 				<hr style="margin: 15px 0; border: none; border-top: 1px solid #ddd;">
 				<?php foreach ($paymentOptions as $opt): ?>

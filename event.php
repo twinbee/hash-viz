@@ -21,7 +21,7 @@
 	// Rollcall data directory
 	define('ROLLCALL_DIR', '../../android/rollcall/');
 	
-	// Function to load attendance for an event
+	// Function to load attendance for an event (returns array with name and comment)
 	function loadEventAttendance($year, $month, $day, $no, $kennel) {
 		$kennelSafe = preg_replace('/[^a-zA-Z0-9_-]/', '_', $kennel);
 		$file = ROLLCALL_DIR . sprintf("%d-%02d-%02d_%d_%s.txt", $year, $month, $day, $no, $kennelSafe);
@@ -31,16 +31,20 @@
 		}
 		
 		$lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-		$names = array();
+		$attendees = array();
 		foreach ($lines as $line) {
 			$parts = explode("\t", $line);
 			if (count($parts) >= 1 && !empty($parts[0])) {
-				$names[] = $parts[0];
+				$attendees[] = array(
+					'name' => $parts[0],
+					'comment' => isset($parts[3]) ? $parts[3] : ''
+				);
 			}
 		}
 		
-		sort($names, SORT_STRING | SORT_FLAG_CASE);
-		return $names;
+		// Sort by name (case-insensitive)
+		usort($attendees, create_function('$a, $b', 'return strcasecmp($a["name"], $b["name"]);'));
+		return $attendees;
 	}
 	
 	$a = array(1=>0,2=>31,3=>59,4=>90,5=>120,6=>151,7=>181,8=>212,9=>243,10=>273,11=>304,12=>334);
@@ -55,21 +59,30 @@
 	
 	$lastDay = "";
 	
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
-		$file = fopen ($filename, "r");
-		if (!$file) {
-				echo "<p>Unable to open file.\n</p>";
-				exit;
+	// Helper function to load events from a month file
+	function loadMonthEvents($year, $month) {
+		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		if (!file_exists($filename)) {
+			return array();
 		}
 		
-		// First pass: collect all events to find prev/next
-		$allEvents = array();
-		$currentEventIndex = -1;
-		$lineIndex = 0;
+		$file = fopen($filename, "r");
+		if (!$file) {
+			return array();
+		}
 		
-		while ($line = fgets ($file, 8192)) {
+		$events = array();
+		$lastDay = "";
+		$n = 0;
+		
+		while ($line = fgets($file, 8192)) {
 			$lineData = explode("\t", $line);
-			$d = isset($lineData[0]) ? $lineData[0] : '';
+			$d = isset($lineData[0]) ? trim($lineData[0]) : '';
+			
+			// Skip header rows or non-numeric day values
+			if (!is_numeric($d)) {
+				continue;
+			}
 			
 			if ($d != $lastDay) {
 				$n = 1;
@@ -78,34 +91,84 @@
 			}
 			$lastDay = $d;
 			
-			$allEvents[] = array('day' => $d, 'no' => $n, 'line' => $lineIndex, 'data' => $lineData);
-			
-			if ($d == $day && $n == $no) {
-				$currentEventIndex = count($allEvents) - 1;
-				$data = $lineData;
-			}
-			$lineIndex++;
+			$events[] = array(
+				'year' => $year,
+				'month' => $month,
+				'day' => $d, 
+				'no' => $n, 
+				'data' => $lineData
+			);
 		}
 		fclose($file);
 		
-		// Find prev/next events
-		$prevEvent = null;
-		$nextEvent = null;
-		if ($currentEventIndex > 0) {
-			$prevEvent = $allEvents[$currentEventIndex - 1];
+		return $events;
+	}
+	
+	// Load current month events
+	$allEvents = loadMonthEvents($year, $month);
+	
+	// Find current event
+	$currentEventIndex = -1;
+	$data = null;
+	foreach ($allEvents as $idx => $evt) {
+		if ($evt['day'] == $day && $evt['no'] == $no) {
+			$currentEventIndex = $idx;
+			$data = $evt['data'];
+			break;
 		}
-		if ($currentEventIndex >= 0 && $currentEventIndex < count($allEvents) - 1) {
-			$nextEvent = $allEvents[$currentEventIndex + 1];
+	}
+	
+	if ($data === null) {
+		echo "<p>Event not found.\n</p>";
+		exit;
+	}
+	
+	// Find prev/next events (including cross-month navigation)
+	$prevEvent = null;
+	$nextEvent = null;
+	
+	if ($currentEventIndex > 0) {
+		// Previous event in same month
+		$prevEvent = $allEvents[$currentEventIndex - 1];
+	} else {
+		// Try to get last event from previous month
+		$prevMonth = $month - 1;
+		$prevYear = $year;
+		if ($prevMonth < 1) {
+			$prevMonth = 12;
+			$prevYear = $year - 1;
 		}
-	  
-		$data[6] = str_replace("CDT", "", str_replace("CST", "", $data[6])); // lops off CDT or CST
-		
-		// Calculate twilight dynamically for this date
-		$twilightTime = getTwilightEnd($day, $month, $year);
-		
-		// Generate weather forecast location from address
-		$weatherLocation = '';
-		$address = isset($data[7]) ? $data[7] : '';
+		$prevMonthEvents = loadMonthEvents($prevYear, $prevMonth);
+		if (count($prevMonthEvents) > 0) {
+			$prevEvent = $prevMonthEvents[count($prevMonthEvents) - 1];
+		}
+	}
+	
+	if ($currentEventIndex >= 0 && $currentEventIndex < count($allEvents) - 1) {
+		// Next event in same month
+		$nextEvent = $allEvents[$currentEventIndex + 1];
+	} else {
+		// Try to get first event from next month
+		$nextMonth = $month + 1;
+		$nextYear = $year;
+		if ($nextMonth > 12) {
+			$nextMonth = 1;
+			$nextYear = $year + 1;
+		}
+		$nextMonthEvents = loadMonthEvents($nextYear, $nextMonth);
+		if (count($nextMonthEvents) > 0) {
+			$nextEvent = $nextMonthEvents[0];
+		}
+	}
+  
+	$data[6] = str_replace("CDT", "", str_replace("CST", "", $data[6])); // lops off CDT or CST
+	
+	// Calculate twilight dynamically for this date
+	$twilightTime = getTwilightEnd($day, $month, $year);
+	
+	// Generate weather forecast location from address
+	$weatherLocation = '';
+	$address = isset($data[7]) ? $data[7] : '';
 		
 		// Try to find ZIP code (5 digits)
 		if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
@@ -151,7 +214,19 @@
 		// Navigation link back to calendar
 		printf("\t\t<p class=\"nav-links\"><a href=\"%s\">&laquo; Back to Calendar</a></p>\n", $calendarMonthLink);
 		
-		printf ("\t\t<h1>%s</h1>\n", $data[1]);
+		// Get kennel icon from event data (column 2)
+		$kennelName = $data[1];
+		$iconFile = isset($data[2]) && strlen(trim($data[2])) > 0 ? trim($data[2]) : '';
+		
+		// Display kennel name with icon
+		if (!empty($iconFile)) {
+			printf("\t\t<div style=\"display: flex; align-items: center; gap: 15px; margin-bottom: 10px;\">\n");
+			printf("\t\t\t<img src=\"%s\" alt=\"%s\" style=\"width: 200px; height: auto;\">\n", htmlspecialchars($iconFile), htmlspecialchars($kennelName));
+			printf("\t\t\t<h1 style=\"margin: 0;\">%s</h1>\n", $data[1]);
+			printf("\t\t</div>\n");
+		} else {
+			printf ("\t\t<h1>%s</h1>\n", $data[1]);
+		}
 		printf ("\t\t<h2>%s</h2>\n", $data[13]);
 
 		if (strlen($data[4]) > 0) printf ("\t\t<h3>Hash Run No %s</h3>\n", $data[4]);
@@ -201,11 +276,19 @@
 		
 		// Load and display check-ins
 		$kennel = isset($data[1]) ? trim($data[1]) : '';
-		$checkedInNames = loadEventAttendance($year, $month, $day, $no, $kennel);
-		if (count($checkedInNames) > 0) {
+		$checkedInAttendees = loadEventAttendance($year, $month, $day, $no, $kennel);
+		if (count($checkedInAttendees) > 0) {
+			$displayNames = array();
+			foreach ($checkedInAttendees as $attendee) {
+				$display = htmlspecialchars($attendee['name']);
+				if (!empty($attendee['comment'])) {
+					$display .= ' <em style="color:#666;">(' . htmlspecialchars($attendee['comment']) . ')</em>';
+				}
+				$displayNames[] = $display;
+			}
 			printf("\t\t<h5><em>Check-ins (%d):</em> %s</h5>\n", 
-				count($checkedInNames), 
-				htmlspecialchars(implode(', ', $checkedInNames))
+				count($checkedInAttendees), 
+				implode(', ', $displayNames)
 			);
 		}
 		
@@ -229,19 +312,19 @@
 		if ($prevEvent) {
 			$prevEventLink = sprintf(
 				'event.php?year=%d&month=%d&day=%d&no=%d',
-				$year, $month, $prevEvent['day'], $prevEvent['no']
+				$prevEvent['year'], $prevEvent['month'], $prevEvent['day'], $prevEvent['no']
 			);
 			$prevKennel = isset($prevEvent['data'][1]) ? trim($prevEvent['data'][1]) : '';
-			$prevEventLabel = sprintf('%s/%d %s', $month, $prevEvent['day'], $prevKennel);
+			$prevEventLabel = sprintf('%d/%d %s', $prevEvent['month'], $prevEvent['day'], $prevKennel);
 		}
 		
 		if ($nextEvent) {
 			$nextEventLink = sprintf(
 				'event.php?year=%d&month=%d&day=%d&no=%d',
-				$year, $month, $nextEvent['day'], $nextEvent['no']
+				$nextEvent['year'], $nextEvent['month'], $nextEvent['day'], $nextEvent['no']
 			);
 			$nextKennel = isset($nextEvent['data'][1]) ? trim($nextEvent['data'][1]) : '';
-			$nextEventLabel = sprintf('%s/%d %s', $month, $nextEvent['day'], $nextKennel);
+			$nextEventLabel = sprintf('%d/%d %s', $nextEvent['month'], $nextEvent['day'], $nextKennel);
 		}
 		
 		// Add prev/next navigation

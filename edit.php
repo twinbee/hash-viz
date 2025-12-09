@@ -357,7 +357,7 @@ function generateDateString($day, $month, $year) {
 // ============================================
 function getIconFiles($year) {
 	$icons = array();
-	$iconDir = dirname(__FILE__); // Current directory (calendar/YYYY/)
+	$iconDir = dirname(__FILE__); // Same directory as edit.php (calendar/YYYY/)
 	
 	// Image extensions to look for
 	$extensions = array('png', 'jpg', 'jpeg', 'gif', 'webp', 'svg');
@@ -500,6 +500,144 @@ $backupCreated = "";
 
 // Get available icons for dropdown
 $availableIcons = getIconFiles($year);
+
+// ============================================
+// Handle ICON UPLOAD
+// ============================================
+$uploadedIcon = '';
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['icon_upload']) && $_FILES['icon_upload']['error'] !== UPLOAD_ERR_NO_FILE) {
+	// Verify CSRF token
+	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
+		$message = "Security error: Invalid request. Please try again.";
+		$messageType = "error";
+	} else {
+		$uploadError = '';
+		$file = $_FILES['icon_upload'];
+		
+		// Check for upload errors
+		if ($file['error'] !== UPLOAD_ERR_OK) {
+			$uploadError = 'Upload failed. Error code: ' . $file['error'];
+		}
+		
+		// Check file size (max 500KB)
+		if (empty($uploadError) && $file['size'] > 500 * 1024) {
+			$uploadError = 'File too large. Maximum size is 500 KB.';
+		}
+		
+		// Check file extension
+		$allowedExts = array('png', 'jpg', 'jpeg', 'svg');
+		$filename = strtolower($file['name']);
+		$ext = pathinfo($filename, PATHINFO_EXTENSION);
+		if (empty($uploadError) && !in_array($ext, $allowedExts)) {
+			$uploadError = 'Invalid file type. Allowed: PNG, JPG, SVG.';
+		}
+		
+		// Check MIME type
+		if (empty($uploadError)) {
+			$finfo = function_exists('finfo_open') ? finfo_open(FILEINFO_MIME_TYPE) : null;
+			if ($finfo) {
+				$mimeType = finfo_file($finfo, $file['tmp_name']);
+				finfo_close($finfo);
+			} else {
+				$mimeType = $file['type'];
+			}
+			$allowedMimes = array('image/png', 'image/jpeg', 'image/svg+xml');
+			if (!in_array($mimeType, $allowedMimes)) {
+				$uploadError = 'Invalid file type. Must be a valid image.';
+			}
+		}
+		
+		// Check dimensions for PNG/JPG (not SVG)
+		if (empty($uploadError) && in_array($ext, array('png', 'jpg', 'jpeg'))) {
+			$imageInfo = getimagesize($file['tmp_name']);
+			if ($imageInfo === false) {
+				$uploadError = 'Could not read image dimensions.';
+			} else {
+				$width = $imageInfo[0];
+				$height = $imageInfo[1];
+				
+				// Check if resizing is needed (max 200x150)
+				if ($width > 200 || $height > 150) {
+					// Try to resize using GD
+					if (function_exists('imagecreatetruecolor')) {
+						// Calculate new dimensions (scale to fit 200x150)
+						$ratio = min(200 / $width, 150 / $height);
+						$newWidth = round($width * $ratio);
+						$newHeight = round($height * $ratio);
+						
+						// Create new image
+						$newImage = imagecreatetruecolor($newWidth, $newHeight);
+						
+						// Handle transparency for PNG
+						if ($ext == 'png') {
+							imagealphablending($newImage, false);
+							imagesavealpha($newImage, true);
+							$transparent = imagecolorallocatealpha($newImage, 0, 0, 0, 127);
+							imagefill($newImage, 0, 0, $transparent);
+						}
+						
+						// Load source image
+						if ($ext == 'png') {
+							$srcImage = imagecreatefrompng($file['tmp_name']);
+						} else {
+							$srcImage = imagecreatefromjpeg($file['tmp_name']);
+						}
+						
+						if ($srcImage) {
+							// Resize
+							imagecopyresampled($newImage, $srcImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+							
+							// Save to temp file
+							$tempFile = $file['tmp_name'] . '_resized';
+							if ($ext == 'png') {
+								imagepng($newImage, $tempFile);
+							} else {
+								imagejpeg($newImage, $tempFile, 90);
+							}
+							
+							imagedestroy($srcImage);
+							imagedestroy($newImage);
+							
+							// Use resized file
+							$file['tmp_name'] = $tempFile;
+						} else {
+							$uploadError = 'Could not process image for resizing.';
+						}
+					} else {
+						$uploadError = 'Image too large (max 200x150). Server cannot resize - please resize before uploading.';
+					}
+				}
+			}
+		}
+		
+		// Move file to same directory as edit.php
+		if (empty($uploadError)) {
+			// Sanitize filename
+			$safeName = preg_replace('/[^a-zA-Z0-9_.-]/', '_', basename($file['name']));
+			$destPath = dirname(__FILE__) . '/' . $safeName;
+			
+			if (move_uploaded_file($file['tmp_name'], $destPath)) {
+				$uploadedIcon = $safeName;
+				$message = "Icon uploaded successfully: " . $safeName;
+				$messageType = "success";
+				// Refresh available icons
+				$availableIcons = getIconFiles($year);
+			} else {
+				$uploadError = 'Failed to save uploaded file.';
+			}
+			
+			// Clean up temp resized file if it exists
+			if (isset($tempFile) && file_exists($tempFile)) {
+				unlink($tempFile);
+			}
+		}
+		
+		if (!empty($uploadError)) {
+			$message = "Icon upload error: " . $uploadError;
+			$messageType = "error";
+		}
+	}
+}
 
 // ============================================
 // Handle DELETE action
@@ -1239,7 +1377,7 @@ $nextNo = $no + 1;
 			</div>
 		<?php endif; ?>
 		
-		<form method="POST" action="" id="editForm" onsubmit="return allowLeave();">
+		<form method="POST" action="" id="editForm" enctype="multipart/form-data" onsubmit="return allowLeave();">
 			<input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 			<?php if ($isNewEvent): ?>
 			<div class="form-group">
@@ -1277,14 +1415,21 @@ $nextNo = $no + 1;
 				<select name="type" id="iconSelect" onchange="updateIconPreview()">
 					<option value="">-- Select Icon --</option>
 					<?php foreach ($availableIcons as $icon): ?>
-					<option value="<?php echo htmlspecialchars($icon); ?>" <?php echo ($currentIcon == $icon) ? 'selected' : ''; ?>>
+					<option value="<?php echo htmlspecialchars($icon); ?>" <?php echo ($currentIcon == $icon || $uploadedIcon == $icon) ? 'selected' : ''; ?>>
 						<?php echo htmlspecialchars($icon); ?>
 					</option>
 					<?php endforeach; ?>
 				</select>
 				<img id="iconPreview" class="icon-preview" src="<?php echo htmlspecialchars($currentIcon); ?>" style="<?php echo empty($currentIcon) ? 'display:none;' : ''; ?>">
+				<div style="margin-top: 10px;">
+					<label style="display: inline-block; padding: 8px 15px; background: #6c757d; color: white; border-radius: 5px; cursor: pointer; font-size: 14px;">
+						📤 Upload Icon...
+						<input type="file" name="icon_upload" accept=".png,.jpg,.jpeg,.svg" style="display: none;" onchange="this.form.submit();">
+					</label>
+					<small style="display: block; color: #666; margin-top: 5px;">PNG, JPG, or SVG. Max 200x150px, 500KB. Will auto-resize if needed.</small>
+				</div>
 				<?php if (empty($availableIcons)): ?>
-				<small style="color: #999;">No icon files found in calendar/<?php echo $year; ?>/ folder.</small>
+				<small style="color: #999;">No icon files found in icons/ folder.</small>
 				<?php endif; ?>
 			</div>
 			

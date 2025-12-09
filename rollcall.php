@@ -1,7 +1,7 @@
 <?php
 // ============================================
 // ROLLCALL.PHP - Attendance Tracking for DFW Hash House Harriers
-// Version 1.4
+// Version 1.5
 // ============================================
 
 // ============================================
@@ -11,6 +11,85 @@
 // Set this to the timezone where events actually occur
 define('EVENT_TIMEZONE', 'America/Chicago'); // Central Time for DFW
 date_default_timezone_set(EVENT_TIMEZONE);
+
+// ============================================
+// AUTHENTICATION
+// ============================================
+require_once('../users.php');
+
+session_start();
+
+// PHP 5.2 compatible password verification (uses MD5)
+function verify_password($password, $hash) {
+	return md5($password) === $hash;
+}
+
+// Handle login
+if (isset($_POST['login'])) {
+	$username = isset($_POST['username']) ? $_POST['username'] : '';
+	$password = isset($_POST['password']) ? $_POST['password'] : '';
+	
+	if (isset($USERS[$username]) && verify_password($password, $USERS[$username])) {
+		$_SESSION['rollcall_user'] = $username;
+		$_SESSION['rollcall_login_time'] = time();
+	} else {
+		$loginError = 'Invalid username or password';
+	}
+}
+
+// Handle logout
+if (isset($_GET['logout'])) {
+	unset($_SESSION['rollcall_user']);
+	unset($_SESSION['rollcall_login_time']);
+}
+
+// Check if logged in
+$isLoggedIn = isset($_SESSION['rollcall_user']);
+
+// Show login form if not authenticated
+if (!$isLoggedIn) {
+	?>
+	<!DOCTYPE html>
+	<html>
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Roll Call - Login Required</title>
+		<style>
+			body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; margin: 0; padding: 20px; }
+			.login-container { max-width: 400px; margin: 50px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+			h1 { text-align: center; color: #333; margin-bottom: 30px; }
+			.form-group { margin-bottom: 20px; }
+			label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+			input[type="text"], input[type="password"] { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+			button { width: 100%; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+			button:hover { opacity: 0.9; }
+			.error { background: #fee; color: #c00; padding: 10px; border-radius: 5px; margin-bottom: 20px; text-align: center; }
+		</style>
+	</head>
+	<body>
+		<div class="login-container">
+			<h1>🔐 Roll Call Login</h1>
+			<?php if (isset($loginError)): ?>
+			<div class="error"><?php echo htmlspecialchars($loginError); ?></div>
+			<?php endif; ?>
+			<form method="POST">
+				<div class="form-group">
+					<label>Username:</label>
+					<input type="text" name="username" required autofocus>
+				</div>
+				<div class="form-group">
+					<label>Password:</label>
+					<input type="password" name="password" required>
+				</div>
+				<button type="submit" name="login">Login</button>
+			</form>
+		</div>
+	</body>
+	</html>
+	<?php
+	exit;
+}
 
 // Data directory for attendance records
 define('ROLLCALL_DIR', '../../android/rollcall/');
@@ -267,7 +346,9 @@ function loadAttendance($year, $month, $day, $no, $kennel) {
 		if (count($parts) >= 2) {
 			$attendance[$parts[0]] = array(
 				'timestamp' => $parts[1],
-				'payment' => isset($parts[2]) ? $parts[2] : ''
+				'payment' => isset($parts[2]) ? $parts[2] : '',
+				'comment' => isset($parts[3]) ? $parts[3] : '',
+				'ip' => isset($parts[4]) ? $parts[4] : ''
 			);
 		}
 	}
@@ -288,11 +369,14 @@ function saveAttendance($year, $month, $day, $no, $kennel, $attendance) {
 	
 	$lines = array();
 	foreach ($attendance as $name => $data) {
-		// Support both old format (string timestamp) and new format (array with timestamp and payment)
+		// Support both old format (string timestamp) and new format (array with timestamp, payment, comment, ip)
 		if (is_array($data)) {
-			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . (isset($data['payment']) ? $data['payment'] : '');
+			$payment = isset($data['payment']) ? $data['payment'] : '';
+			$comment = isset($data['comment']) ? $data['comment'] : '';
+			$ip = isset($data['ip']) ? $data['ip'] : '';
+			$lines[] = $name . "\t" . $data['timestamp'] . "\t" . $payment . "\t" . $comment . "\t" . $ip;
 		} else {
-			$lines[] = $name . "\t" . $data . "\t";
+			$lines[] = $name . "\t" . $data . "\t\t\t";
 		}
 	}
 	
@@ -982,6 +1066,8 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 <body>
 	<div class="nav-links">
 		<a href="event.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>">&laquo; Back to Event</a>
+		 | 
+		<a href="?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>&logout=1">Logout (<?php echo htmlspecialchars($_SESSION['rollcall_user']); ?>)</a>
 	</div>
 	
 	<div class="header">
@@ -1101,11 +1187,21 @@ $paymentOptions = array('', 'Cash', 'PayPal', 'Venmo', 'Zelle', 'Cash App');
 					$hasherData = $attendance[$hasher];
 					$timestamp = is_array($hasherData) ? $hasherData['timestamp'] : $hasherData;
 					$payment = is_array($hasherData) && isset($hasherData['payment']) ? $hasherData['payment'] : '';
+					$comment = is_array($hasherData) && isset($hasherData['comment']) ? $hasherData['comment'] : '';
+					$ip = is_array($hasherData) && isset($hasherData['ip']) ? $hasherData['ip'] : '';
 				?>
 				<form method="POST" style="margin:0;">
 					<div class="hasher-item checked-in">
 						<input type="checkbox" class="hasher-checkbox" checked onclick="this.form.querySelector('button[name=toggle]').click();">
-						<span class="hasher-name"><?php echo htmlspecialchars($hasher); ?></span>
+						<span class="hasher-name">
+							<?php echo htmlspecialchars($hasher); ?>
+							<?php if (!empty($comment)): ?>
+							<span style="font-weight: normal; font-style: italic; color: #666; font-size: 12px;"> - <?php echo htmlspecialchars($comment); ?></span>
+							<?php endif; ?>
+							<?php if (!empty($ip)): ?>
+							<span style="font-weight: normal; color: #999; font-size: 10px;" title="IP Address"> [<?php echo htmlspecialchars($ip); ?>]</span>
+							<?php endif; ?>
+						</span>
 						<select name="payment_<?php echo md5($hasher); ?>" class="payment-select" onchange="this.form.querySelector('button[name=update_payment]').click();">
 							<?php foreach ($paymentOptions as $opt): ?>
 							<option value="<?php echo htmlspecialchars($opt); ?>" <?php echo ($payment == $opt) ? 'selected' : ''; ?>>
