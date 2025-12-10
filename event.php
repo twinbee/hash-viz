@@ -160,6 +160,69 @@
 			$nextEvent = $nextMonthEvents[0];
 		}
 	}
+	
+	// Find prev/next events for SAME KENNEL (using column 1 - kennel name)
+	$currentKennel = isset($data[1]) ? trim($data[1]) : '';
+	$prevKennelEvent = null;
+	$nextKennelEvent = null;
+	
+	// Search backwards for previous kennel event
+	// First check current month before this event
+	for ($i = $currentEventIndex - 1; $i >= 0; $i--) {
+		if (isset($allEvents[$i]['data'][1]) && trim($allEvents[$i]['data'][1]) === $currentKennel) {
+			$prevKennelEvent = $allEvents[$i];
+			break;
+		}
+	}
+	
+	// If not found, search previous months (up to 6 months back)
+	if ($prevKennelEvent === null) {
+		for ($m = 1; $m <= 6; $m++) {
+			$searchMonth = $month - $m;
+			$searchYear = $year;
+			while ($searchMonth < 1) {
+				$searchMonth += 12;
+				$searchYear--;
+			}
+			$searchEvents = loadMonthEvents($searchYear, $searchMonth);
+			// Search from end of month backwards
+			for ($i = count($searchEvents) - 1; $i >= 0; $i--) {
+				if (isset($searchEvents[$i]['data'][1]) && trim($searchEvents[$i]['data'][1]) === $currentKennel) {
+					$prevKennelEvent = $searchEvents[$i];
+					break 2; // Break both loops
+				}
+			}
+		}
+	}
+	
+	// Search forwards for next kennel event
+	// First check current month after this event
+	for ($i = $currentEventIndex + 1; $i < count($allEvents); $i++) {
+		if (isset($allEvents[$i]['data'][1]) && trim($allEvents[$i]['data'][1]) === $currentKennel) {
+			$nextKennelEvent = $allEvents[$i];
+			break;
+		}
+	}
+	
+	// If not found, search next months (up to 6 months ahead)
+	if ($nextKennelEvent === null) {
+		for ($m = 1; $m <= 6; $m++) {
+			$searchMonth = $month + $m;
+			$searchYear = $year;
+			while ($searchMonth > 12) {
+				$searchMonth -= 12;
+				$searchYear++;
+			}
+			$searchEvents = loadMonthEvents($searchYear, $searchMonth);
+			// Search from start of month forwards
+			for ($i = 0; $i < count($searchEvents); $i++) {
+				if (isset($searchEvents[$i]['data'][1]) && trim($searchEvents[$i]['data'][1]) === $currentKennel) {
+					$nextKennelEvent = $searchEvents[$i];
+					break 2; // Break both loops
+				}
+			}
+		}
+	}
   
 	$data[6] = str_replace("CDT", "", str_replace("CST", "", $data[6])); // lops off CDT or CST
 	
@@ -238,7 +301,12 @@
 			printf ("\t\t<h4>End of twilight: %s</h4>\n", $twilightTime);
 		}	
 		
-		printf ("\t\t<hr />\n\t\t<h6>%s</h6>\n\t\t<hr />\n", strlen($data[3]) > 0 ? $data[3] : "Nothing yet");
+		// Only display title if it exists
+		if (strlen($data[3]) > 0) {
+			printf ("\t\t<hr />\n\t\t<h6>%s</h6>\n\t\t<hr />\n", $data[3]);
+		} else {
+			printf ("\t\t<hr />\n");
+		}
 		printf ("\t\t<h5><em>Time:</em> %s</h5>\n", strlen($data[6]) > 0 ? $data[6] : "Nothing yet");
 		if (strlen($data[7]) > 0) {
 			printf ("\t\t<h5><em>Start address:</em> %s</h5>\n", $data[7]);
@@ -340,6 +408,44 @@
 			printf("\t\t\t<span style=\"color: #ccc;\">Next ▶</span>\n");
 		}
 		printf("\t\t</p>\n");
+		
+		// Add kennel-specific prev/next navigation
+		$prevKennelLink = null;
+		$nextKennelLink = null;
+		$prevKennelLabel = null;
+		$nextKennelLabel = null;
+		
+		if ($prevKennelEvent) {
+			$prevKennelLink = sprintf(
+				'event.php?year=%d&month=%d&day=%d&no=%d',
+				$prevKennelEvent['year'], $prevKennelEvent['month'], $prevKennelEvent['day'], $prevKennelEvent['no']
+			);
+			$prevKennelLabel = sprintf('%d/%d', $prevKennelEvent['month'], $prevKennelEvent['day']);
+		}
+		
+		if ($nextKennelEvent) {
+			$nextKennelLink = sprintf(
+				'event.php?year=%d&month=%d&day=%d&no=%d',
+				$nextKennelEvent['year'], $nextKennelEvent['month'], $nextKennelEvent['day'], $nextKennelEvent['no']
+			);
+			$nextKennelLabel = sprintf('%d/%d', $nextKennelEvent['month'], $nextKennelEvent['day']);
+		}
+		
+		// Only show kennel nav if there's at least one link
+		if ($prevKennelLink || $nextKennelLink) {
+			printf("\t\t<p style=\"margin-top: 10px; display: flex; justify-content: space-between; align-items: center; background: #f0f0f0; padding: 8px 12px; border-radius: 5px; font-size: 14px;\">\n");
+			if ($prevKennelLink) {
+				printf("\t\t\t<a href=\"%s\" style=\"text-decoration: none; color: #666;\">◀◀ %s <em>%s</em></a>\n", $prevKennelLink, htmlspecialchars($prevKennelLabel), htmlspecialchars($currentKennel));
+			} else {
+				printf("\t\t\t<span style=\"color: #ccc;\">◀◀ Previous %s</span>\n", htmlspecialchars($currentKennel));
+			}
+			if ($nextKennelLink) {
+				printf("\t\t\t<a href=\"%s\" style=\"text-decoration: none; color: #666;\"><em>%s</em> %s ▶▶</a>\n", $nextKennelLink, htmlspecialchars($currentKennel), htmlspecialchars($nextKennelLabel));
+			} else {
+				printf("\t\t\t<span style=\"color: #ccc;\">Next %s ▶▶</span>\n", htmlspecialchars($currentKennel));
+			}
+			printf("\t\t</p>\n");
+		}
 		
 		// Generate back to calendar link for specific month
 		$calendarMonthLink = sprintf('$%02d-%d.php', $month, $year);
