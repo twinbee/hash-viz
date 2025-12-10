@@ -7,6 +7,28 @@ ini_set('display_errors', 1);
 $data_dir = '../android/';
 
 /**
+ * Clean HTML tags from text, replacing br and p tags with spaces
+ */
+function clean_html($text) {
+    if (empty($text)) return $text;
+    
+    // Replace <br> and <p> tags with spaces
+    $text = preg_replace('/<br\s*\/?>/i', ' ', $text);
+    $text = preg_replace('/<\/?p\s*\/?>/i', ' ', $text);
+    
+    // Strip all remaining HTML tags
+    $text = strip_tags($text);
+    
+    // Remove any remaining < or > characters
+    $text = str_replace(array('<', '>'), '', $text);
+    
+    // Clean up whitespace (collapse multiple spaces into one)
+    $text = preg_replace('/\s+/', ' ', $text);
+    
+    return trim($text);
+}
+
+/**
  * Parse a hash event file and return array of events
  */
 function parse_event_file($filepath) {
@@ -79,8 +101,122 @@ function parse_event_file($filepath) {
 }
 
 /**
- * Search for events matching the query
+ * Search HTML files for legacy events (2005-2012)
+ * Returns array of results with snippet and link
  */
+function search_html_events($search_query, $base_dir = '../calendar/') {
+    $results = array();
+    $search_lower = strtolower($search_query);
+    
+    // Search years 2005-2012
+    for ($year = 2005; $year <= 2012; $year++) {
+        $year_dir = $base_dir . $year . '/';
+        if (!is_dir($year_dir)) continue;
+        
+        // Get all .html and .htm files
+        $html_files = array_merge(
+            glob($year_dir . '*.html'),
+            glob($year_dir . '*.htm')
+        );
+        
+        foreach ($html_files as $file) {
+            $filename = basename($file);
+            
+            // Skip files that start with $
+            if (substr($filename, 0, 1) === '$') {
+                continue;
+            }
+            
+            $content = file_get_contents($file);
+            if ($content === false) continue;
+            
+            // Replace <br> and <p> tags with spaces before stripping all tags
+            $content_cleaned = preg_replace('/<br\s*\/?>/i', ' ', $content);
+            $content_cleaned = preg_replace('/<\/?p\s*\/?>/i', ' ', $content_cleaned);
+            
+            // Strip ALL HTML tags for searching
+            $text_content = strip_tags($content_cleaned);
+            
+            // Remove any remaining < or > characters that might have escaped
+            $text_content = str_replace(array('<', '>'), '', $text_content);
+            
+            $text_lower = strtolower($text_content);
+            
+            // Check if search query is in the content
+            if (strpos($text_lower, $search_lower) !== false) {
+                // Extract a snippet around the match
+                $pos = strpos($text_lower, $search_lower);
+                $snippet_start = max(0, $pos - 100);
+                $snippet_length = 200 + strlen($search_query);
+                $snippet = substr($text_content, $snippet_start, $snippet_length);
+                
+                // Clean up whitespace (collapse multiple spaces into one)
+                $snippet = preg_replace('/\s+/', ' ', $snippet);
+                $snippet = trim($snippet);
+                
+                // Add ellipsis if we're not at the start/end
+                if ($snippet_start > 0) {
+                    $snippet = '...' . $snippet;
+                }
+                if ($snippet_start + $snippet_length < strlen($text_content)) {
+                    $snippet = $snippet . '...';
+                }
+                
+                // Try to extract date and kennel from title/h1 tags
+                $date = '';
+                $date_sortable = '';
+                $kennel = '';
+                if (preg_match('/<title>(.*?)<\/title>/i', $content, $title_match)) {
+                    $title = $title_match[1];
+                    // Extract date if present (MM/DD/YYYY format)
+                    if (preg_match('/(\d{1,2})\/(\d{1,2})\/(\d{4})/', $title, $date_match)) {
+                        $date = $date_match[0];
+                        // Convert to sortable format YYYY-MM-DD
+                        $date_sortable = sprintf('%04d-%02d-%02d', $date_match[3], $date_match[1], $date_match[2]);
+                    }
+                    // Extract kennel name
+                    if (preg_match('/(.*?)\s+for\s+/i', $title, $kennel_match)) {
+                        $kennel = trim($kennel_match[1]);
+                    }
+                }
+                
+                // If no date from title, try h2 tag
+                if (empty($date) && preg_match('/<h2>(.*?)<\/h2>/i', $content, $h2_match)) {
+                    $h2_text = strip_tags($h2_match[1]);
+                    if (preg_match('/(\w+day,\s+\w+\s+\d{1,2}.*?(\d{4}))/i', $h2_text, $date_match)) {
+                        $date = $date_match[1];
+                        // Try to convert to sortable format
+                        $timestamp = strtotime($date_match[1]);
+                        if ($timestamp !== false) {
+                            $date_sortable = date('Y-m-d', $timestamp);
+                        }
+                    }
+                }
+                
+                // If still no sortable date, try to extract from filename (e.g., "02-19.html" -> 2011-02-19)
+                if (empty($date_sortable) && preg_match('/^(\d{1,2})-(\d{1,2})\.html?$/i', $filename, $file_match)) {
+                    $date_sortable = sprintf('%04d-%02d-%02d', $year, $file_match[1], $file_match[2]);
+                    if (empty($date)) {
+                        $date = $file_match[1] . '/' . $file_match[2] . '/' . $year;
+                    }
+                }
+                
+                $results[] = array(
+                    'type' => 'html',
+                    'file' => $filename,
+                    'year' => $year,
+                    'date' => $date,
+                    'date_sortable' => $date_sortable,
+                    'kennel' => $kennel,
+                    'snippet' => $snippet,
+                    'url' => $year . '/' . $filename
+                );
+            }
+        }
+    }
+    
+    return $results;
+}
 function search_events($search_query, $data_dir) {
     $all_events = array();
     
@@ -239,6 +375,24 @@ function generate_pagination($current_page, $total_pages, $search_query, $per_pa
     return $html;
 }
 
+/**
+ * Comparison function for sorting HTML events (descending - most recent first)
+ */
+function compare_html_events($a, $b) {
+    // If both have sortable dates, compare them
+    if (!empty($a['date_sortable']) && !empty($b['date_sortable'])) {
+        return strcmp($b['date_sortable'], $a['date_sortable']);
+    }
+    // If only one has a date, put it first
+    if (!empty($a['date_sortable'])) return -1;
+    if (!empty($b['date_sortable'])) return 1;
+    // Otherwise compare by year then filename
+    if ($a['year'] != $b['year']) {
+        return $b['year'] - $a['year'];
+    }
+    return strcmp($b['file'], $a['file']);
+}
+
 // Handle search
 $search_query = isset($_GET['q']) ? trim($_GET['q']) : '';
 $page = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
@@ -251,25 +405,39 @@ if (!in_array($per_page, $valid_per_page)) {
 }
 
 $results = array();
+$html_results = array();
+$html_results_paginated = array();
 $past_events = array();
 $future_events = array();
 $past_total = 0;
 $future_total = 0;
+$html_total = 0;
 $past_pages = 1;
 $future_pages = 1;
+$html_pages = 1;
 
 if (!empty($search_query)) {
+    // Search structured data (2012+)
     $results = search_events($search_query, $data_dir);
     $split_results = split_events_by_date($results);
     
+    // Search HTML files (2005-2012)
+    $html_results = search_html_events($search_query);
+    
+    // Sort HTML results by date (most recent first)
+    usort($html_results, 'compare_html_events');
+    
     $past_total = count($split_results['past']);
     $future_total = count($split_results['future']);
+    $html_total = count($html_results);
     
     if ($per_page === 'unlimited') {
         $past_events = $split_results['past'];
         $future_events = $split_results['future'];
+        $html_results_paginated = $html_results;
         $past_pages = 1;
         $future_pages = 1;
+        $html_pages = 1;
     } else {
         $items_per_page = (int)$per_page;
         
@@ -282,6 +450,11 @@ if (!empty($search_query)) {
         $future_pages = max(1, ceil($future_total / $items_per_page));
         $future_offset = ($page - 1) * $items_per_page;
         $future_events = array_slice($split_results['future'], $future_offset, $items_per_page);
+        
+        // Calculate pagination for HTML results
+        $html_pages = max(1, ceil($html_total / $items_per_page));
+        $html_offset = ($page - 1) * $items_per_page;
+        $html_results_paginated = array_slice($html_results, $html_offset, $items_per_page);
     }
 }
 ?>
@@ -447,6 +620,29 @@ if (!empty($search_query)) {
             padding: 8px 12px;
             color: #999;
         }
+        .legacy-event {
+            background-color: #fffef0;
+            border-left-color: #f39c12;
+        }
+        .event-snippet {
+            margin: 8px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-left: 3px solid #ddd;
+            font-size: 14px;
+            color: #555;
+            font-style: italic;
+        }
+        .legacy-badge {
+            display: inline-block;
+            background-color: #f39c12;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
     </style>
 </head>
 <body>
@@ -476,7 +672,7 @@ if (!empty($search_query)) {
         <div class="info-message">
             Enter a search term to find hash events. You can search by kennel name, hare name, location, event title, or event details.
         </div>
-    <?php elseif (empty($results)): ?>
+    <?php elseif (empty($results) && empty($html_results)): ?>
         <div class="no-results">
             No events found matching "<?php echo htmlspecialchars($search_query); ?>"
         </div>
@@ -493,25 +689,33 @@ if (!empty($search_query)) {
                 <div class="event-item">
                     <div class="event-date"><?php echo format_date($event['date']); ?></div>
                     <div class="event-kennel">
-                        <?php echo htmlspecialchars($event['kennel']); ?> 
+                        <?php echo htmlspecialchars(clean_html($event['kennel'])); ?> 
                         <?php if (!empty($event['run_number'])): ?>- Run #<?php echo htmlspecialchars($event['run_number']); ?><?php endif; ?>
                     </div>
                     <?php if (!empty($event['title'])): ?>
-                    <div class="event-title"><?php echo htmlspecialchars($event['title']); ?></div>
+                    <div class="event-title"><?php echo htmlspecialchars(clean_html($event['title'])); ?></div>
                     <?php endif; ?>
                     <?php if (!empty($event['hare'])): ?>
                     <div class="event-details">
-                        <strong>Hare:</strong> <?php echo htmlspecialchars($event['hare']); ?>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($event['time'])): ?>
-                    <div class="event-details">
-                        <strong>Time:</strong> <?php echo htmlspecialchars($event['time']); ?>
+                        <strong>Hare:</strong> <?php echo htmlspecialchars(clean_html($event['hare'])); ?>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($event['location'])): ?>
                     <div class="event-details">
-                        <strong>Location:</strong> <?php echo htmlspecialchars($event['location']); ?>
+                        <strong>Location:</strong> <?php echo htmlspecialchars(clean_html($event['location'])); ?>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($event['details'])): ?>
+                    <?php 
+                        // Get first line of description
+                        $details_clean = clean_html($event['details']);
+                        $first_line = strtok($details_clean, "\n");
+                        if (strlen($first_line) > 150) {
+                            $first_line = substr($first_line, 0, 150) . '...';
+                        }
+                    ?>
+                    <div class="event-details" style="font-style: italic; color: #777;">
+                        <?php echo htmlspecialchars($first_line); ?>
                     </div>
                     <?php endif; ?>
                     <a href="<?php echo get_event_url($event, $event["event_number"]); ?>" class="event-link" target="_blank">View Event Page →</a>
@@ -532,31 +736,69 @@ if (!empty($search_query)) {
                 <div class="event-item">
                     <div class="event-date"><?php echo format_date($event['date']); ?></div>
                     <div class="event-kennel">
-                        <?php echo htmlspecialchars($event['kennel']); ?> 
+                        <?php echo htmlspecialchars(clean_html($event['kennel'])); ?> 
                         <?php if (!empty($event['run_number'])): ?>- Run #<?php echo htmlspecialchars($event['run_number']); ?><?php endif; ?>
                     </div>
                     <?php if (!empty($event['title'])): ?>
-                    <div class="event-title"><?php echo htmlspecialchars($event['title']); ?></div>
+                    <div class="event-title"><?php echo htmlspecialchars(clean_html($event['title'])); ?></div>
                     <?php endif; ?>
                     <?php if (!empty($event['hare'])): ?>
                     <div class="event-details">
-                        <strong>Hare:</strong> <?php echo htmlspecialchars($event['hare']); ?>
-                    </div>
-                    <?php endif; ?>
-                    <?php if (!empty($event['time'])): ?>
-                    <div class="event-details">
-                        <strong>Time:</strong> <?php echo htmlspecialchars($event['time']); ?>
+                        <strong>Hare:</strong> <?php echo htmlspecialchars(clean_html($event['hare'])); ?>
                     </div>
                     <?php endif; ?>
                     <?php if (!empty($event['location'])): ?>
                     <div class="event-details">
-                        <strong>Location:</strong> <?php echo htmlspecialchars($event['location']); ?>
+                        <strong>Location:</strong> <?php echo htmlspecialchars(clean_html($event['location'])); ?>
+                    </div>
+                    <?php endif; ?>
+                    <?php if (!empty($event['details'])): ?>
+                    <?php 
+                        // Get first line of description
+                        $details_clean = clean_html($event['details']);
+                        $first_line = strtok($details_clean, "\n");
+                        if (strlen($first_line) > 150) {
+                            $first_line = substr($first_line, 0, 150) . '...';
+                        }
+                    ?>
+                    <div class="event-details" style="font-style: italic; color: #777;">
+                        <?php echo htmlspecialchars($first_line); ?>
                     </div>
                     <?php endif; ?>
                     <a href="<?php echo get_event_url($event, $event["event_number"]); ?>" class="event-link" target="_blank">View Event Page →</a>
                 </div>
             <?php endforeach; ?>
             <?php echo generate_pagination($page, $past_pages, $search_query, $per_page); ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if (!empty($html_results_paginated)): ?>
+        <div class="results-section">
+            <h2>📂 Unstructured Events (2005-2012)</h2>
+            <div class="result-count">
+                Showing <?php echo count($html_results_paginated); ?> of <?php echo $html_total; ?> unstructured event(s)
+                <?php if ($per_page !== 'unlimited'): ?> (Page <?php echo $page; ?> of <?php echo $html_pages; ?>)<?php endif; ?>
+            </div>
+            <?php foreach ($html_results_paginated as $event): ?>
+                <div class="event-item legacy-event">
+                    <div class="event-kennel">
+                        <?php if (!empty($event['kennel'])): ?>
+                            <?php echo htmlspecialchars($event['kennel']); ?>
+                        <?php else: ?>
+                            Event from <?php echo $event['year']; ?>
+                        <?php endif; ?>
+                        <span class="legacy-badge">UNSTRUCTURED</span>
+                    </div>
+                    <?php if (!empty($event['date'])): ?>
+                    <div class="event-date"><?php echo htmlspecialchars($event['date']); ?></div>
+                    <?php endif; ?>
+                    <div class="event-snippet">
+                        <?php echo htmlspecialchars($event['snippet']); ?>
+                    </div>
+                    <a href="<?php echo htmlspecialchars($event['url']); ?>" class="event-link" target="_blank">View Event Page →</a>
+                </div>
+            <?php endforeach; ?>
+            <?php echo generate_pagination($page, $html_pages, $search_query, $per_page); ?>
         </div>
         <?php endif; ?>
 
