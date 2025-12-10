@@ -142,7 +142,7 @@ HTML_HEAD_MONTH = """
 // script to highlight todays date via style override
 var d = new Date();
 var id = "j" + d.getMonth() + d.getDate();
-      if (d.getYear() % 100 == {year_short}) document.write('<style type="text/css" media="screen"></style>');
+      if (d.getYear() % 100 == {year_short}) document.write('<style type="text/css" media="screen"><!-- table.inner#' + id + ' {{ \tbackground-image: url(throb.gif); }}--> </style>');
 
 			// script to open navagation window
 			function openNav() {{
@@ -193,25 +193,25 @@ HTML_FOOTER_MONTH = """
                 </table>
             </td>
         </tr>
+        <tr id="nav">
+            <td>
+            <div id="menu">
+                <a href="/index.html">home</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                calendar&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/Events/index.html">events</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/Maps/index.html">maps</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/Our_Idiots/index.html">our idiots</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/Write-Ups/index.html">write-ups</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/Road_Trip/index.html">road trip</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="planning.php">year</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="/mobile/index.php">mobile</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="#" onclick="openNav();">nav</a>&nbsp;&nbsp;&nbsp;&nbsp;
+                <a href="../search.php">search</a>&nbsp;&nbsp;&nbsp;&nbsp;
+            </div>
+            </td>
+        </tr>
     </table>
 </div>
-
-<tr id="nav">
-			<td>
-			<div id="menu">
-				<a href="/index.html">home</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				calendar&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Events/index.html">events</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Maps/index.html">maps</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Our_Idiots/index.html">our idiots</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Write-Ups/index.html">write-ups</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/Road_Trip/index.html">road trip</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="planning.php">year</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="/mobile/index.php">mobile</a>&nbsp;&nbsp;&nbsp;&nbsp;
-				<a href="#" onclick="openNav();">nav</a>&nbsp;&nbsp;&nbsp;&nbsp;
-			</div>
-			</td>
-		</tr>
 </body>
 </html>
 """

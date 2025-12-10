@@ -27,7 +27,7 @@ var id = "j" + d.getMonth() + d.getDate();
 <body>
 <map name="Map" id="Map">
 	<area shape="rect" coords="0,0,150,91" href="$11-2025.php" alt="Previous Month" />
-	<area shape="rect" coords="957,0,807,91" href="RoadClosed.jpg" alt="Next Month" />
+	<area shape="rect" coords="957,0,807,91" href="../2026/$01-2026.php" alt="Next Month" />
 </map>
 <div class=container>
 	<table class="overall"  border="0" cellspacing="0" cellpadding="0">

@@ -48,10 +48,14 @@ def get_special_dates_for_year(year):
     
     # --- RED BAR Holidays (Major US & Drinking/Personal) ---
     red_holidays = {
-        (1, 1): "New Year's Day", (2, 14): "Valentine's Day", (3, 17): "St. Patrick's Day",
-        (5, 5): "Cinco de Mayo", (6, 19): "Juneteenth", (7, 4): "Independence Day",
-        (7, 31): "Gispert's Birthday", (10, 31): "Halloween", (11, 11): "Veterans Day",
-        (12, 25): "Christmas Day", (12, 31): "New Year's Eve"
+        (1, 1): "New Year's Day", (2, 14): "Valentine's", (3, 14): "Pi Day",
+        (3, 17): "St. Patrick's", (3, 21): "FullMoon Founded", (3, 31): "FtW H3 Founded", (4, 1): "April Fool's", 
+        (4, 20): "Safety Awareness Day", (5, 5): "Cinco de Mayo", (5, 31): "YAKH3 Founded",
+        (6, 7): "NODUH Founded", (6, 19): "Juneteenth", (7, 4): "EndOfPenis Day",
+        (7, 31): "Gispert's BDay", (8, 4): "DUH Founded", (9, 19): "Talk Like a Pirate!", 
+        (10, 1): "Dallas H3 Founded", (10, 14): "National Sober Day", (10, 31): "Halloween", 
+        (11, 10): "Marine Corps BDay", (11, 11): "Veterans Day", (12, 13): "GQH3 Founded",
+        (12, 25): "Christmas", (12, 31): "New Year's Eve"
     }
     
     for (m, d), name in red_holidays.items():
@@ -70,6 +74,16 @@ def get_special_dates_for_year(year):
     if columbus: special_dates[(columbus.month, columbus.day)] = ("Columbus Day", "holiday")
     thanksgiving = get_day_of_occurrence(year, 11, 3, 4) 
     if thanksgiving: special_dates[(thanksgiving.month, thanksgiving.day)] = ("Thanksgiving Day", "holiday")
+
+    # DST Changes (Second Sunday in March, First Sunday in November)
+    march_first = date(year, 3, 1)
+    first_sunday_march = march_first + timedelta(days=(6 - march_first.weekday()) % 7)
+    dst_start = first_sunday_march + timedelta(weeks=1)
+    special_dates[(dst_start.month, dst_start.day)] = ("Spring Forward (CDT)", "holiday")
+    
+    november_first = date(year, 11, 1)
+    dst_end = november_first + timedelta(days=(6 - november_first.weekday()) % 7)
+    special_dates[(dst_end.month, dst_end.day)] = ("Fall Back (CST)", "holiday")
 
     # --- BLUE BAR Holidays (EOP and Hashmas) ---
     july_4th = date(year, 7, 4)
