@@ -18,6 +18,9 @@
 	// Include twilight calculator
 	require_once('twilight.php');
 	
+	// Include weather forecast functions
+	require_once('dfwforecast.php');
+	
 	// Rollcall data directory
 	define('ROLLCALL_DIR', '../../android/rollcall/');
 	
@@ -229,30 +232,8 @@
 	// Calculate twilight dynamically for this date
 	$twilightTime = getTwilightEnd($day, $month, $year);
 	
-	// Generate weather forecast location from address
-	$weatherLocation = '';
-	$address = isset($data[7]) ? $data[7] : '';
-		
-		// Try to find ZIP code (5 digits)
-		if (preg_match('/(\d{5})(?:-\d{4})?/', $address, $matches)) {
-			$weatherLocation = $matches[1];
-		}
-		// If no ZIP, try to find city, state pattern
-		else if (preg_match('/([A-Za-z\s]+),?\s*(?:TX|Texas)/i', $address, $matches)) {
-			$cityName = trim($matches[1]);
-			$cityName = preg_replace('/[^A-Za-z\s]/', '', $cityName);
-			$cityName = trim($cityName);
-			if (!empty($cityName)) {
-				$weatherLocation = $cityName . ', TX';
-			}
-		}
-		
-		// Default to Addison if no location found
-		if (empty($weatherLocation)) {
-			$weatherLocation = 'Addison, TX';
-		}
-		
-		$weatherUrl = 'https://forecast.weather.gov/zipcity.php?inputstring=' . urlencode($weatherLocation);
+	// Get weather forecast
+	$weatherText = getWeatherOneLiner($data[7], $data[13]);
 		
 		// Generate edit link
 		$editLink = sprintf(
@@ -294,12 +275,19 @@
 
 		if (strlen($data[4]) > 0) printf ("\t\t<h3>Hash Run No %s</h3>\n", $data[4]);
 		
+		// Twilight and Weather on same line
 		if (strlen($data[15]) > 2) {
 			$updatedText = str_replace("<br />", "", $data[15]);
-			printf ("\t\t<h4>End of twilight: %s<br />Updated: %s (<a href=\"%s\">edit</a>)</h4>\n", $twilightTime, $updatedText, $editLink);
+			printf ("\t\t<h4 style=\"display: flex; justify-content: space-between; align-items: center;\">\n");
+			printf ("\t\t\t<span>Twilight: %s | Updated: %s (<a href=\"%s\">edit</a>)</span>\n", $twilightTime, $updatedText, $editLink);
+			printf ("\t\t\t<span style=\"font-style: italic; color: #666;\">%s</span>\n", $weatherText);
+			printf ("\t\t</h4>\n");
 		} else {
-			printf ("\t\t<h4>End of twilight: %s</h4>\n", $twilightTime);
-		}	
+			printf ("\t\t<h4 style=\"display: flex; justify-content: space-between; align-items: center;\">\n");
+			printf ("\t\t\t<span>Twilight: %s</span>\n", $twilightTime);
+			printf ("\t\t\t<span style=\"font-style: italic; color: #666;\">%s</span>\n", $weatherText);
+			printf ("\t\t</h4>\n");
+		}
 		
 		// Only display title if it exists
 		if (strlen($data[3]) > 0) {
@@ -470,14 +458,6 @@
 		printf("\t\t\t<a href=\"%s\">download invite</a> | \n", $calendarLink);
 		printf("\t\t\t<a href=\"%s\">back to calendar</a>\n", $calendarMonthLink);
 		printf("\t\t</p>\n");
-		
-		// Horizontal rule before weather forecast section
-		printf("\t\t<hr />\n");
-		
-		// Add weather forecast section
-		printf("\t\t<br />\n");
-		printf("\t\t<h5><strong>Weather Forecast for %s:</strong></h5>\n", htmlspecialchars($weatherLocation));
-		printf("\t\t<iframe src=\"%s\" width=\"100%%\" height=\"600\" frameborder=\"0\" scrolling=\"yes\" style=\"border: 1px solid #ccc;\"></iframe>\n", $weatherUrl);
 
 		?>
     
