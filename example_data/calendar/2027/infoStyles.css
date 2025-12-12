@@ -1,0 +1,222 @@
+@charset "UTF-8";
+body {
+	margin: 0; 
+	padding: 0;
+	text-align: center;
+	color: #000000;
+	font-family: Georgia, "Times New Roman", Times, serif;
+	font-size: 11pt;
+	background-color: #C7CAC8;
+}
+#container {
+	width: 600px;
+	background: #000000;
+	border: 1px solid #000000;
+	text-align: justify;
+	background-color: #ffffff;
+	margin-right: auto;
+	margin-left: auto;
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
+small {
+	font-family: "Arial Black", Gadget, sans-serif;
+	font-size: 25px;
+}
+#mainContent {
+	padding: 0 20px; 
+}
+h1 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 24pt;
+	color: #4A2E01;
+	letter-spacing: 5px;
+	text-align: left;
+	margin-top: 20px;
+	margin-bottom: 10px;
+}
+h2 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 16pt;
+	color: #40076B;
+	padding-top: 0px;
+	margin-top: 0px;
+	line-height: 20px;
+}
+h3 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 14pt;
+	color: #206660;
+}
+h4 {
+		font-family: "Courier New", Courier, monospace;
+		font-size: 10pt;
+		color: #666;
+		text-align: left;
+}
+h5 {
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+	font-size: 16px;
+	color: #553101;
+	font-weight: normal;
+	margin: 0px;
+	padding: 5px;
+}
+h6 {
+	font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+	font-size: 14pt;
+	color: #22b;
+}
+h6 em {
+	color: #800;
+	font-style: normal;
+}
+div.directions {
+	background-color: #FFF6F2;
+	margin-right: 24px;
+	margin-left: 24px;
+	margin-top: 0px;
+	margin-bottom: 0px;
+	padding-top: 5px;
+	padding-right: 15px;
+	padding-bottom: 5px;
+	padding-left: 15px;
+}
+div.directions p {
+	padding: 5px;
+	margin-bottom: 0px;
+	margin-top: 0px;
+	margin-right: 0px;
+	margin-left: 0px;
+}
+.directions ul li {
+	color: #000;
+	list-style-type: square;
+}
+ul {
+	color: #891e0c;
+}
+ol     {
+	color: #039;
+}
+ul ul {
+	color: #006;
+	list-style-type: none;
+	border-left-width: 1px;
+	border-left-style: double;
+	border-left-color: #006;
+	padding-left: 15px;
+	margin-left: 30px;
+}
+.blue {
+	color: #00C;
+}
+.red {
+	color: #C00;
+}
+h5 strong {
+	color: #F00;
+}
+h1#GQ {
+	color: #bb00aa;
+}
+.map {
+	background-color: #ffffff;
+	text-align: center;
+	vertical-align: baseline;
+	margin-bottom: 30px;
+	margin-top: 20px;
+	padding-top: 20px;
+	padding-bottom: 30px;
+	border: 1px solid #CCC;
+	margin-right: 24px;
+	margin-left: 24px;
+	font-family: "Comic Sans MS", cursive;
+	font-size: 1.5em;
+	color: #009;
+	background-color: #FFF;
+}
+.right {
+	float: right;
+	margin-left: 12px;
+}
+.smlcaps    {
+	font-variant: small-caps;
+}
+h5  a {
+	border-bottom-width: 2px;
+	border-bottom-style: dashed;
+	border-bottom-color: #0033FF;
+	text-decoration: none;
+	color: #553101;
+}
+#mainContent a:hover {
+	color: #00F;
+	border-bottom-width: 2px;
+	border-bottom-style: solid;
+	border-bottom-color: #00f;
+}
+.footnote {
+	margin-top: 2em;
+	margin-right: 3em;
+	margin-bottom: 1em;
+	margin-left: 3em;
+	text-indent: -5.3em;
+	padding-top: 5px;
+	padding-right: 5px;
+	padding-bottom: 5px;
+	padding-left: 6em;
+	border-top-width: 1px;
+	border-top-style: solid;
+	border-top-color: #666;
+}
+.admonish {
+	font-family: Arial, Helvetica, sans-serif;
+	border: 2px solid #F00;
+	width: 450px;
+	margin-right: auto;
+	margin-left: auto;
+	padding-top: 5px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	padding-left: 5px;
+	margin-top: 30px;
+	margin-bottom: 30px;
+}
+.underline {
+	border-bottom-style: solid;
+	border-bottom-width: 1px;
+	border-bottom-color: #000;
+}
+.review {
+	background-color: #FFE5DA;
+	margin-top: 10px;
+	margin-right: 10px;
+	margin-bottom: 30px;
+	margin-left: 10px;
+	padding-top: 0px;
+	padding-right: 10px;
+	padding-bottom: 20px;
+	padding-left: 10px;
+}
+.title {
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 24px;
+	color: #00a;
+	font-weight: normal;
+	padding: 5px;
+}
+.keyword {
+	font-family: Arial, Helvetica, sans-serif;
+	font-weight: bold;
+	color: #700;
+}
+h1 .and {
+	color: #d00;
+	font-size: 16px;
+}
+h5 em {
+	font-style: normal;
+	font-weight: normal;
+	color: #00D;
+}

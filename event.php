@@ -15,11 +15,11 @@
 	// Timezone configuration - DFW is Central Time
 	date_default_timezone_set('America/Chicago');
 	
-	// Include twilight calculator
-	require_once('twilight.php');
+	// Include twilight calculator (moved to parent directory)
+	require_once('../twilight.php');
 	
-	// Include weather forecast functions
-	require_once('dfwforecast.php');
+	// Include weather forecast functions (moved to parent directory)
+	require_once('../dfwforecast.php');
 	
 	// Rollcall data directory
 	define('ROLLCALL_DIR', '../../android/rollcall/');
@@ -124,6 +124,31 @@
 	if ($data === null) {
 		echo "<p>Event not found.\n</p>";
 		exit;
+	}
+	
+	// ============================================
+	// LOAD TODAY'S EVENTS
+	// ============================================
+	$todayYear = date('Y');
+	$todayMonth = date('n'); // 1-12 without leading zero
+	$todayDay = date('j'); // 1-31 without leading zero
+	
+	// Load events for today's month
+	$todayEvents = loadMonthEvents($todayYear, $todayMonth);
+	
+	// Filter to only events happening today
+	$todayEventLinks = array();
+	foreach ($todayEvents as $evt) {
+		if ($evt['day'] == $todayDay) {
+			$kennelName = isset($evt['data'][1]) ? trim($evt['data'][1]) : 'Event';
+			$todayEventLinks[] = array(
+				'year' => $evt['year'],
+				'month' => $evt['month'],
+				'day' => $evt['day'],
+				'no' => $evt['no'],
+				'kennel' => $kennelName
+			);
+		}
 	}
 	
 	// Find prev/next events (including cross-month navigation)
@@ -237,14 +262,14 @@
 		
 		// Generate edit link
 		$editLink = sprintf(
-			'http://dfwhhh.org/calendar/%d/edit.php?month=%d&day=%d&year=%d&no=%d',
-			$year, $month, $day, $year, $no
+			'http://dfwhhh.org/calendar/edit.php?month=%d&day=%d&year=%d&no=%d',
+			$month, $day, $year, $no
 		);
 		
 		// Generate calendar link
 		$calendarLink = sprintf(
-			'http://dfwhhh.org/calendar/%d/generate_ics.php?month=%d&day=%d&year=%d&no=%d',
-			$year, $month, $day, $year, $no
+			'http://dfwhhh.org/calendar/generate_ics.php?month=%d&day=%d&year=%d&no=%d',
+			$month, $day, $year, $no
 		);
 	
 		printf ("\t<title>%s for %s/%s/%s</title>\n", $data[1], $month, $day, $year);
@@ -256,7 +281,25 @@
 		$calendarMonthLink = sprintf('$%02d-%d.php', $month, $year);
 		
 		// Navigation link back to calendar
-		printf("\t\t<p class=\"nav-links\"><a href=\"%s\">&laquo; Back to Calendar</a></p>\n", $calendarMonthLink);
+		printf("\t\t<p class=\"nav-links\">\n");
+		printf("\t\t\t<a href=\"%s\">&laquo; Back to Calendar</a>\n", $calendarMonthLink);
+		
+		// Today's events section
+		printf("\t\t\t<span style=\"float: right;\">\n");
+		printf("\t\t\t\t<strong>Today:</strong> ");
+		if (empty($todayEventLinks)) {
+			printf("no events");
+		} else {
+			$todayLinkParts = array();
+			foreach ($todayEventLinks as $todayEvt) {
+				$todayUrl = sprintf('event.php?year=%d&month=%d&day=%d&no=%d', 
+					$todayEvt['year'], $todayEvt['month'], $todayEvt['day'], $todayEvt['no']);
+				$todayLinkParts[] = sprintf('<a href="%s">%s</a>', $todayUrl, htmlspecialchars($todayEvt['kennel']));
+			}
+			printf("%s", implode(' | ', $todayLinkParts));
+		}
+		printf("\t\t\t</span>\n");
+		printf("\t\t</p>\n");
 		
 		// Get kennel icon from event data (column 2)
 		$kennelName = $data[1];
@@ -440,13 +483,13 @@
 		
 		// Generate rollcall link
 		$rollcallLink = sprintf(
-			'rollcall.php?month=%d&day=%d&year=%d&no=%d',
+			'../rollcall.php?month=%d&day=%d&year=%d&no=%d',
 			$month, $day, $year, $no
 		);
 		
 		// Generate checkin link
 		$checkinLink = sprintf(
-			'checkin.php?month=%d&day=%d&year=%d&no=%d',
+			'../checkin.php?month=%d&day=%d&year=%d&no=%d',
 			$month, $day, $year, $no
 		);
 		

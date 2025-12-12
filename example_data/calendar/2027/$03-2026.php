@@ -1,0 +1,473 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="pragma" content="no-cache" />
+<meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
+<meta http-equiv="content-type" content="text/html;charset=utf-8" />
+<meta name="generator" content="Martha's Calendar Generator" />
+<link rel="apple-touch-icon" href="/dfwh3-152x152.png" />
+<title>March, 2026 Hash Events</title>
+<link href="calendar.css" rel="stylesheet" type="text/css" media="all" />
+
+<script language="JavaScript">
+// script to highlight todays date via style override
+var d = new Date();
+var id = "j" + d.getMonth() + d.getDate();
+      if (d.getYear() % 100 == 26) document.write('<style type="text/css" media="screen"></style>');
+
+			// script to open navagation window
+			function openNav() {
+			window.open("/calendar/Nav/index.html", "nav", "width=320, height=1040, top=0, left=0");
+			}
+		</script>
+
+<?php
+    $year=2026;
+    $month=3;
+    // Links are passed from Python for correct cross-year referencing
+    $prev_link="$02-2026.php";
+    $next_link="$04-2026.php";
+    include 'php.php';
+?>
+</head>
+<body>
+<map name="Map" id="Map">
+    <area shape="rect" coords="0,0,150,91" href="$02-2026.php" alt="Previous Month" />
+    <!-- FIXED: Using coordinates 957,0,807,91 as requested for the Next Month button -->
+    <area shape="rect" coords="957,0,807,91" href="$04-2026.php" alt="Next Month" />
+</map>
+<div class=container>
+    <table class="overall"  border="0" cellspacing="0" cellpadding="0">
+        <tr>
+            <td>
+                <table class="banner" border="0" cellspacing="0" cellpadding="0">
+                    <tr>
+                        <td><img src="month-03.png" alt="March"  border="0" usemap="#Map"/></td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        <tr>
+            <td>
+                <table class="main"  border="0" cellspacing="0" cellpadding="0">
+                    <tr >
+                        <th>Sunday</th>
+                        <th>Monday</th>
+                        <th>Tuesday</th>
+                        <th>Wednesday</th>
+                        <th>Thursday</th>
+                        <th>Friday</th>
+                        <th>Saturday</th>
+                    </tr>
+					<tr>
+						<td class="day">
+							<table class="inner" id="j21">
+								<tr>
+									<td class="dom">1</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 1, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j22">
+								<tr>
+									<td class="dom">2</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 2, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j23">
+								<tr>
+									<td class="dom">3</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 3, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j24">
+								<tr>
+									<td class="dom">4</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 4, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j25">
+								<tr>
+									<td class="dom">5</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 5, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j26">
+								<tr>
+									<td class="dom">6</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 6, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j27">
+								<tr>
+									<td class="dom">7</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 7, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td class="day">
+							<table class="inner" id="j28">
+								<tr>
+									<td class="dom">8</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 8, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j29">
+								<tr>
+									<td class="dom">9</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 9, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j210">
+								<tr>
+									<td class="dom">10</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 10, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j211">
+								<tr>
+									<td class="dom">11</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 11, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j212">
+								<tr>
+									<td class="dom">12</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 12, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j213">
+								<tr>
+									<td class="dom">13</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 13, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j214">
+								<tr>
+									<td class="dom">14</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 14, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td class="day">
+							<table class="inner" id="j215">
+								<tr>
+									<td class="dom">15</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 15, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j216">
+								<tr>
+									<td class="dom">16</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 16, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j217">
+								<tr>
+									<td class="holiday"><span class="tag">St. Patrick's Day</span>17</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 17, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j218">
+								<tr>
+									<td class="dom">18</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 18, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j219">
+								<tr>
+									<td class="dom">19</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 19, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j220">
+								<tr>
+									<td class="dom">20</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 20, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j221">
+								<tr>
+									<td class="dom">21</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 21, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td class="day">
+							<table class="inner" id="j222">
+								<tr>
+									<td class="dom">22</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 22, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j223">
+								<tr>
+									<td class="dom">23</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 23, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j224">
+								<tr>
+									<td class="dom">24</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 24, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j225">
+								<tr>
+									<td class="dom">25</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 25, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j226">
+								<tr>
+									<td class="dom">26</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 26, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j227">
+								<tr>
+									<td class="dom">27</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 27, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j228">
+								<tr>
+									<td class="dom">28</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 28, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td class="day">
+							<table class="inner" id="j229">
+								<tr>
+									<td class="dom">29</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 29, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j230">
+								<tr>
+									<td class="dom">30</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 30, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="day">
+							<table class="inner" id="j231">
+								<tr>
+									<td class="dom">31</td>
+								</tr>
+								<tr>
+									<td class="event">
+										<?php fillIn(3, 31, 2026); ?>
+									</td>
+								</tr>
+							</table>
+						</td>
+						<td class="empty"></td>
+						<td class="empty"></td>
+						<td class="empty"></td>
+						<td class="empty"></td>
+					</tr>
+
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<tr id="nav">
+			<td>
+			<div id="menu">
+				<a href="/index.html">home</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				calendar&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Events/index.html">events</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Maps/index.html">maps</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Our_Idiots/index.html">our idiots</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Write-Ups/index.html">write-ups</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/Road_Trip/index.html">road trip</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="planning.php">year</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="/mobile/index.php">mobile</a>&nbsp;&nbsp;&nbsp;&nbsp;
+				<a href="#" onclick="openNav();">nav</a>&nbsp;&nbsp;&nbsp;&nbsp;
+			</div>
+			</td>
+		</tr>
+</body>
+</html>

@@ -1,0 +1,101 @@
+@charset "UTF-8";
+body {
+	background-color: #C7CAC8;
+}
+#container {
+	width: 500px;
+	background: #000000;
+	border: 1px solid #000000;
+	text-align: justify;
+	background-color: #fff;
+	margin-right: auto;
+	margin-left: auto;
+	margin-top: 20px;
+	margin-bottom: 20px;
+	padding: 20px;
+	position: relative;
+}
+h1 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 24pt;
+	color: #4A2E01;
+	letter-spacing: 5px;
+	text-align: left;
+	margin-top: 20px;
+	margin-bottom: 10px;
+}
+h2 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 16pt;
+	color: #40076B;
+	padding-top: 0px;
+	margin-top: 0px;
+	line-height: 20px;
+}
+h3 {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 14pt;
+	color: #206660;
+}
+h4 {
+		font-family: "Courier New", Courier, monospace;
+		font-size: 10pt;
+		color: #666;
+		text-align: left;
+}
+h5 {
+	font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+	font-size: 16px;
+	color: #553101;
+	font-weight: normal;
+	margin: 0px;
+	padding: 5px;
+}
+h5 strong {
+	color: #F00;
+}
+h5 em {
+	font-style: normal;
+	font-weight: normal;
+	color: #00D;
+}
+h5  a {
+	text-decoration: none;
+	color: #03F;
+	padding-top: 1px;
+	padding-right: 4px;
+	padding-bottom: 1px;
+	padding-left: 4px;
+	font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+	border: 2px dotted #03F;
+}
+h6 {
+	font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+	font-size: 14pt;
+	color: #22b;
+	margin: 0px;
+	padding: 0px;
+}
+h6 em {
+	color: #800;
+	font-style: normal;
+}
+#container .hide {
+	border: 1px solid #036;
+	position: absolute;
+	background-color: #FFC;
+	padding: 10px;
+	font-family: Arial, Helvetica, sans-serif;
+	text-align: left;
+	left: -2000em;
+	color: #039;
+	width: 200px;
+	text-decoration: none;
+	font-size: 0.8em;
+}
+#container h5:hover  .hide {
+	left: 200px;
+}
+.big {
+	width: 100%;
+}

@@ -13,7 +13,7 @@ define('EVENT_TIMEZONE', 'America/Chicago'); // Central Time for DFW
 date_default_timezone_set(EVENT_TIMEZONE);
 
 // Data directory for attendance records
-define('ROLLCALL_DIR', '../../android/rollcall/');
+define('ROLLCALL_DIR', '../android/rollcall/');
 define('HASHERS_FILE', 'hashers.txt');
 define('COOKIE_NAME', 'dfw_hasher_name');
 define('COOKIE_EXPIRY', 365 * 24 * 60 * 60); // 1 year
@@ -83,7 +83,7 @@ function getClientIP() {
 // HELPER: Get event info from data file
 // ============================================
 function getEventInfo($year, $month, $day, $no) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 	if (!file_exists($filename)) {
 		return null;
 	}

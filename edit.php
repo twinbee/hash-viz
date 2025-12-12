@@ -24,9 +24,9 @@ date_default_timezone_set('America/Chicago'); // Central Time for DFW
 define('EDITPHP_VERSION', '2.2');
 
 // Load users from separate file (in parent calendar/ directory)
-require_once('../users.php');
+require_once('users.php');
 
-define('BACKUP_DIR', '../../android/backups/');
+define('BACKUP_DIR', '../android/backups/');
 
 // ============================================
 // SECURITY FUNCTIONS
@@ -367,7 +367,13 @@ function generateDateString($day, $month, $year) {
 // ============================================
 function getIconFiles($year) {
 	$icons = array();
-	$iconDir = dirname(__FILE__); // Same directory as edit.php (calendar/YYYY/)
+	// Icons are in calendar/YYYY/ directory (same as event.php)
+	$iconDir = dirname(__FILE__) . '/' . $year;
+	
+	// Check if year directory exists
+	if (!is_dir($iconDir)) {
+		return array();
+	}
 	
 	// Image extensions to look for
 	$extensions = array('png', 'jpg', 'jpeg', 'gif', 'webp', 'svg');
@@ -580,6 +586,23 @@ $backupCreated = "";
 // EDIT LOCK HANDLING
 // ============================================
 $editLockWarning = '';
+$publicationStatus = '';
+
+// ============================================
+// DETERMINE PUBLICATION STATUS
+// ============================================
+if ($isNewEvent) {
+	$publicationStatus = '<span style="color: #856404;">📝 Unpublished (new)</span>';
+} else {
+	// Check if event has been edited (has an update timestamp)
+	if (isset($data[15]) && !empty($data[15])) {
+		$updateTime = htmlspecialchars($data[15]);
+		$publicationStatus = '<span style="color: #0c5460;">✓ Published - Edited on ' . $updateTime . '</span>';
+	} else {
+		// Published but never edited
+		$publicationStatus = '<span style="color: #155724;">✓ Published</span>';
+	}
+}
 $currentLock = null;
 
 // Handle lock refresh via AJAX
@@ -730,20 +753,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_FILES['icon_upload']) && $_F
 			}
 		}
 		
-		// Move file to same directory as edit.php
+		// Move file to year directory (calendar/YYYY/)
 		if (empty($uploadError)) {
-			// Sanitize filename
-			$safeName = preg_replace('/[^a-zA-Z0-9_.-]/', '_', basename($file['name']));
-			$destPath = dirname(__FILE__) . '/' . $safeName;
+			// Year directory should already exist (contains event.php)
+			$yearDir = dirname(__FILE__) . '/' . $year;
+			if (!is_dir($yearDir)) {
+				$uploadError = 'Year directory does not exist: ' . $year;
+			}
 			
-			if (move_uploaded_file($file['tmp_name'], $destPath)) {
-				$uploadedIcon = $safeName;
-				$message = "Icon uploaded successfully: " . $safeName;
-				$messageType = "success";
-				// Refresh available icons
-				$availableIcons = getIconFiles($year);
-			} else {
-				$uploadError = 'Failed to save uploaded file.';
+			if (empty($uploadError)) {
+				// Sanitize filename
+				$safeName = preg_replace('/[^a-zA-Z0-9_.-]/', '_', basename($file['name']));
+				$destPath = $yearDir . '/' . $safeName;
+				
+				if (move_uploaded_file($file['tmp_name'], $destPath)) {
+					$uploadedIcon = $safeName;
+					$message = "Icon uploaded successfully to " . $year . "/: " . $safeName;
+					$messageType = "success";
+					// Refresh available icons
+					$availableIcons = getIconFiles($year);
+				} else {
+					$uploadError = 'Failed to save uploaded file.';
+				}
 			}
 			
 			// Clean up temp resized file if it exists
@@ -768,7 +799,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['delete']) && !$isNewEv
 		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
 	} else {
-		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 		
 		// Create backup before deleting
 		$eventInfo = "DELETE day=$day no=$no";
@@ -839,12 +870,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	if (!isset($_POST['csrf_token']) || !verifyCsrfToken($_POST['csrf_token'])) {
 		$message = "Security error: Invalid request. Please try again.";
 		$messageType = "error";
+	// Validate year range (current year through 2050)
+	} else if (isset($_POST['year'])) {
+		$submittedYear = intval($_POST['year']);
+		$currentYear = date('Y');
+		if ($submittedYear < $currentYear || $submittedYear > 2050) {
+			$message = "Year must be between " . $currentYear . " and 2050.";
+			$messageType = "error";
+		} else {
+			// Update year from POST if valid
+			$year = $submittedYear;
+			$month = isset($_POST['month']) ? intval($_POST['month']) : $month;
+		}
+	}
+	
+	// Only proceed if no errors so far
+	if (empty($message)) {
 	// Validate time format for EditHash 1.28 compatibility
-	} else if (!empty($_POST['time']) && !validateTimeFormat($_POST['time'])) {
+	if (!empty($_POST['time']) && !validateTimeFormat($_POST['time'])) {
 		$message = "Time must start with format \"H:MM AM\" or \"H:MM PM\" (e.g., \"7:00 PM\" or \"2:00 PM Trail starts\") for compatibility with EditHash 1.28 app.";
 		$messageType = "error";
 	} else {
-		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 		
 		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
 		if (get_magic_quotes_gpc()) {
@@ -994,10 +1041,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 	// Write back to file
 	$result = file_put_contents($filename, implode("\n", $lines));
 	if ($result !== false) {
-		// Redirect to event.php
+		// Redirect to event.php (lives in calendar/YYYY/ directory)
 		$eventUrl = sprintf(
-			'event.php?year=%d&month=%d&day=%d&no=%d',
-			$year, $month, $day, $eventNumber
+			'%d/event.php?year=%d&month=%d&day=%d&no=%d',
+			$year, $year, $month, $day, $eventNumber
 		);
 		header('Location: ' . $eventUrl);
 		exit;
@@ -1005,6 +1052,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		$message = "Error: Unable to write to file. Check file permissions.";
 		$messageType = "error";
 	}
+	} // end validation check
 	} // end CSRF check
 }
 
@@ -1021,7 +1069,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 		$message = "Time must start with format \"H:MM AM\" or \"H:MM PM\" (e.g., \"7:00 PM\" or \"2:00 PM Trail starts\") for compatibility with EditHash 1.28 app.";
 		$messageType = "error";
 	} else {
-		$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+		$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 		
 		// Strip slashes from POST data if magic_quotes_gpc is enabled (PHP 5.2 issue)
 		if (get_magic_quotes_gpc()) {
@@ -1164,8 +1212,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			// Release edit lock
 			releaseEditLock($year, $month, $day, $no);
 			$eventUrl = sprintf(
-				'event.php?year=%d&month=%d&day=%d&no=%d',
-				$year, $month, $day, $no
+				'%d/event.php?year=%d&month=%d&day=%d&no=%d',
+				$year, $year, $month, $day, $no
 			);
 			header('Location: ' . $eventUrl);
 			exit;
@@ -1182,7 +1230,7 @@ $data = array('', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '');
 $eventsOnThisDay = 0;
 
 if (!$isNewEvent) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 	
 	// Count events on this day for prev/next navigation
 	$eventsOnThisDay = countEventsOnDay($filename, $day);
@@ -1279,6 +1327,8 @@ $nextNo = $no + 1;
 		.btn-logout { background: #666; color: white; border: none; float: right; }
 		.btn-new { background: #2196F3; color: white; border: none; }
 		.btn-delete { background: #dc3545; color: white; border: none; }
+		.btn-recover { background: #ff9800; color: white; border: none; }
+		.btn-recover:hover { background: #e68900; }
 		.btn-nav { background: #6c757d; color: white; border: none; padding: 8px 15px; font-size: 14px; }
 		.btn-nav:hover { background: #5a6268; }
 		.btn-nav-disabled { background: #ccc; color: #666; cursor: not-allowed; }
@@ -1434,8 +1484,9 @@ $nextNo = $no + 1;
 	function updateIconPreview() {
 		var select = document.getElementById('iconSelect');
 		var preview = document.getElementById('iconPreview');
+		var year = preview.getAttribute('data-year');
 		if (select.value) {
-			preview.src = select.value;
+			preview.src = year + '/' + select.value;
 			preview.style.display = 'inline-block';
 		} else {
 			preview.style.display = 'none';
@@ -1444,6 +1495,27 @@ $nextNo = $no + 1;
 	
 	function confirmDelete() {
 		return confirm('Are you sure you want to delete this event?\n\nThis action cannot be undone (but a backup will be created).');
+	}
+	
+	function confirmRecovery() {
+		var message = '⚠️ EVENT RECOVERY TOOL\n\n' +
+			'This tool is designed to restore events that have been:\n' +
+			'• Accidentally deleted\n' +
+			'• Accidentally reverted to an earlier version\n' +
+			'• Lost due to editing errors\n\n' +
+			'DO NOT USE if:\n' +
+			'• You are just browsing\n' +
+			'• The event data is currently correct\n' +
+			'• You want to modify an existing event (use Edit instead)\n\n' +
+			'The recovery tool compares current data against backups to find missing or reduced information.\n\n' +
+			'Continue to Event Recovery?';
+		
+		if (confirm(message)) {
+			// Mark form as unchanged so we don't get the "unsaved changes" warning
+			formChanged = false;
+			return true;
+		}
+		return false;
 	}
 	
 	// Track form changes
@@ -1503,6 +1575,12 @@ $nextNo = $no + 1;
 		<div style="background: #fff3cd; border: 1px solid #ffc107; color: #856404; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
 			<?php echo $editLockWarning; ?>
 			<br><small>You can still edit, but be aware your changes may conflict with theirs.</small>
+		</div>
+		<?php endif; ?>
+		
+		<?php if (!empty($publicationStatus)): ?>
+		<div style="background: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; border-radius: 5px; margin-bottom: 20px; font-size: 14px;">
+			<strong>Publication Status:</strong> <?php echo $publicationStatus; ?>
 		</div>
 		<?php endif; ?>
 		
@@ -1593,11 +1671,17 @@ $nextNo = $no + 1;
 						</option>
 						<?php endfor; ?>
 					</select>
-					<select name="year" id="yearSelect" disabled>
-						<option value="<?php echo $year; ?>"><?php echo $year; ?></option>
+					<select name="year" id="yearSelect">
+						<?php 
+						$currentYear = date('Y');
+						for ($y = $currentYear; $y <= 2050; $y++): ?>
+						<option value="<?php echo $y; ?>" <?php echo ($y == $year) ? 'selected' : ''; ?>>
+							<?php echo $y; ?>
+						</option>
+						<?php endfor; ?>
 					</select>
 				</div>
-				<small style="color: #666;">Note: Year is determined by the calendar folder.</small>
+				<small style="color: #666;">You can create events from <?php echo $currentYear; ?> through 2050.</small>
 			</div>
 			<?php endif; ?>
 			
@@ -1616,7 +1700,7 @@ $nextNo = $no + 1;
 					</option>
 					<?php endforeach; ?>
 				</select>
-				<img id="iconPreview" class="icon-preview" src="<?php echo htmlspecialchars($currentIcon); ?>" style="<?php echo empty($currentIcon) ? 'display:none;' : ''; ?>">
+				<img id="iconPreview" class="icon-preview" src="<?php echo !empty($currentIcon) ? htmlspecialchars($year . '/' . $currentIcon) : ''; ?>" style="<?php echo empty($currentIcon) ? 'display:none;' : ''; ?>" data-year="<?php echo $year; ?>">
 				<div style="margin-top: 10px;">
 					<label style="display: inline-block; padding: 8px 15px; background: #6c757d; color: white; border-radius: 5px; cursor: pointer; font-size: 14px;">
 						📤 Upload Icon...
@@ -1625,7 +1709,7 @@ $nextNo = $no + 1;
 					<small style="display: block; color: #666; margin-top: 5px;">PNG, JPG, or SVG. Max 200x150px, 500KB. Will auto-resize if needed.</small>
 				</div>
 				<?php if (empty($availableIcons)): ?>
-				<small style="color: #999;">No icon files found in icons/ folder.</small>
+				<small style="color: #999;">No icon files found in <?php echo $year; ?>/ folder.</small>
 				<?php endif; ?>
 			</div>
 			
@@ -1761,7 +1845,7 @@ $nextNo = $no + 1;
 				<?php if ($isNewEvent): ?>
 				<a href="/calendar" class="btn btn-cancel">❌ Cancel</a>
 				<?php else: ?>
-				<a href="event.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>" class="btn btn-cancel">❌ Cancel</a>
+				<a href="<?php echo $year; ?>/event.php?year=<?php echo $year; ?>&month=<?php echo $month; ?>&day=<?php echo $day; ?>&no=<?php echo $no; ?>" class="btn btn-cancel">❌ Cancel</a>
 				<?php endif; ?>
 			</div>
 		</form>
@@ -1777,6 +1861,11 @@ $nextNo = $no + 1;
 			<form method="POST" action="" onsubmit="formChanged = false; return confirmDelete();">
 				<input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 				<button type="submit" name="delete" class="btn btn-delete">🗑️ Delete Event</button>
+			</form>
+			<br>
+			<p>Restore a previously deleted event from backup.</p>
+			<form method="GET" action="recover.php" onsubmit="return confirmRecovery();" style="display: inline;">
+				<button type="submit" class="btn btn-recover">🔄 Event Recovery</button>
 			</form>
 		</div>
 		

@@ -15,7 +15,7 @@ date_default_timezone_set(EVENT_TIMEZONE);
 // ============================================
 // AUTHENTICATION
 // ============================================
-require_once('../users.php');
+require_once('users.php');
 
 session_start();
 
@@ -92,7 +92,7 @@ if (!$isLoggedIn) {
 }
 
 // Data directory for attendance records
-define('ROLLCALL_DIR', '../../android/rollcall/');
+define('ROLLCALL_DIR', '../android/rollcall/');
 define('HASHERS_FILE', 'hashers.txt');
 
 // Testing mode - bypasses time check
@@ -122,7 +122,7 @@ function sanitizeHasherName($name) {
 // HELPER: Get event info from data file
 // ============================================
 function getEventInfo($year, $month, $day, $no) {
-	$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+	$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 	if (!file_exists($filename)) {
 		return null;
 	}

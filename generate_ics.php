@@ -10,7 +10,7 @@ $day = $_GET["day"];
 $no = $_GET["no"];
 
 // Load event data
-$filename = sprintf("../../android/%d-%02d.txt", $year, $month);
+$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 $file = fopen($filename, "r");
 if (!$file) {
 	die("Unable to open file.");
