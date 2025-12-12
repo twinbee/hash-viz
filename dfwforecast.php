@@ -72,27 +72,69 @@ function getWeatherDescription($code) {
 
 // Get weather summary using Open-Meteo API
 function getWeatherOneLiner($address, $eventDate) {
-	// Parse the event date
-	$eventTimestamp = strtotime($eventDate);
-	$currentTimestamp = time();
-	
-	// Calculate days until event (compare dates only, not times)
-	$eventDay = date('Y-m-d', $eventTimestamp);
-	$currentDay = date('Y-m-d', $currentTimestamp);
-	
-	$eventDayTimestamp = strtotime($eventDay);
-	$currentDayTimestamp = strtotime($currentDay);
-	
-	$daysUntil = floor(($eventDayTimestamp - $currentDayTimestamp) / 86400);
+	// Parse the event date using DateTime to handle dates beyond 2038
+	try {
+		// Parse event date
+		$eventDateTime = new DateTime($eventDate);
+		$eventDay = $eventDateTime->format('Y-m-d');
+		
+		// Get current date
+		$currentDateTime = new DateTime();
+		$currentDay = $currentDateTime->format('Y-m-d');
+		
+		// Calculate difference manually for PHP 5.2 compatibility
+		// Convert to timestamps for comparison
+		$eventParts = explode('-', $eventDay);
+		$currentParts = explode('-', $currentDay);
+		
+		$eventYear = (int)$eventParts[0];
+		$eventMonth = (int)$eventParts[1];
+		$eventDayNum = (int)$eventParts[2];
+		
+		$currentYear = (int)$currentParts[0];
+		$currentMonth = (int)$currentParts[1];
+		$currentDayNum = (int)$currentParts[2];
+		
+		// For dates within reasonable range, use mktime
+		// For far future dates (>2037), do a simple year-based calculation
+		if ($eventYear >= 2038) {
+			// For dates beyond 2037, just check if it's future or past
+			if ($eventYear > $currentYear) {
+				$daysUntil = 999; // Large positive number (far future)
+			} else if ($eventYear < $currentYear) {
+				$daysUntil = -999; // Large negative number (far past)
+			} else {
+				// Same year - compare months and days
+				if ($eventMonth > $currentMonth || 
+				    ($eventMonth == $currentMonth && $eventDayNum > $currentDayNum)) {
+					$daysUntil = 999; // Future this year
+				} else if ($eventMonth < $currentMonth || 
+				           ($eventMonth == $currentMonth && $eventDayNum < $currentDayNum)) {
+					$daysUntil = -1; // Past this year
+				} else {
+					$daysUntil = 0; // Today
+				}
+			}
+		} else {
+			// For dates up to 2037, use mktime for accurate calculation
+			$eventTimestamp = mktime(0, 0, 0, $eventMonth, $eventDayNum, $eventYear);
+			$currentTimestamp = mktime(0, 0, 0, $currentMonth, $currentDayNum, $currentYear);
+			$daysUntil = floor(($eventTimestamp - $currentTimestamp) / 86400);
+		}
+		
+	} catch (Exception $e) {
+		// Fallback if DateTime parsing fails
+		return "No weather";
+	}
 	
 	// If event already passed
 	if ($daysUntil < 0) {
 		return "Event has passed";
 	}
 	
-	// If event is more than 10 days away
+	// If event is more than 10 days away (outside forecast window)
 	if ($daysUntil > 10) {
-		return "Nothing yet";
+		return "No weather";
 	}
 	
 	// Extract ZIP code from address
@@ -114,7 +156,7 @@ function getWeatherOneLiner($address, $eventDate) {
 	$lon = $coords['lon'];
 	
 	// Format date for API (YYYY-MM-DD)
-	$forecastDate = date('Y-m-d', $eventTimestamp);
+	$forecastDate = $eventDay;
 	
 	// Open-Meteo API - free, no key required, reliable
 	// Get daily forecast including temperature, precipitation, and weather code

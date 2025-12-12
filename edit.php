@@ -358,8 +358,16 @@ function createBackup($filename, $username = '', $eventInfo = '') {
 // HELPER FUNCTION: Generate date string from day/month/year
 // ============================================
 function generateDateString($day, $month, $year) {
-	$timestamp = mktime(0, 0, 0, $month, $day, $year);
-	return date('l, F d, Y', $timestamp);
+	// Use DateTime instead of mktime to support dates beyond 2038
+	try {
+		$date = new DateTime();
+		$date->setDate($year, $month, $day);
+		$date->setTime(0, 0, 0);
+		return $date->format('l, F d, Y');
+	} catch (Exception $e) {
+		// Fallback to basic format if DateTime fails
+		return sprintf('%s %d, %d', date('F', mktime(0, 0, 0, $month, 1, 2020)), $day, $year);
+	}
 }
 
 // ============================================
