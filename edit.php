@@ -404,6 +404,44 @@ function getIconFiles($year) {
 }
 
 // ============================================
+// HELPER FUNCTION: Get full moon icon based on month
+// ============================================
+function get_full_moon_icon($month, $year) {
+	// Full moon icons use Calendar Icons-MM.png format
+	return sprintf('Calendar Icons-%02d.png', $month);
+}
+
+// ============================================
+// HELPER FUNCTION: Get kennel list with default icons
+// ============================================
+function getKennelList($month = null, $year = null) {
+	$kennels = array(
+		"7-ELEVEn hash house harriers" => "7-ELEVEn.png",
+		"Bike Hash" => "bikeHash.png",
+		"Dallas Hash" => "dallas.png",
+		"Dallas Urban Hash" => "DUH.png",
+		"Ft Worth Hash" => "ftworth.png",
+		"Grapevine Quarterly Hash" => "GQhash.png",
+		"NO-NO-DUH" => "nonoduh.png",
+		"NODUH Hash" => "NoDHHH2.png",
+		"YAKH3" => "YAKH3.png",
+		"YakH3-HH" => "YAKH3-HH.png"
+	);
+	
+	// Full Moon uses dynamic icon based on month
+	if ($month !== null && $year !== null) {
+		$kennels["Full Moon"] = get_full_moon_icon($month, $year);
+	} else {
+		$kennels["Full Moon"] = "Calendar Icons-01.png";
+	}
+	
+	// Sort by kennel name (keys)
+	ksort($kennels);
+	
+	return $kennels;
+}
+
+// ============================================
 // EDIT LOCK SYSTEM - Track who is editing what
 // ============================================
 define('LOCK_DIR', dirname(__FILE__) . '/locks');
@@ -577,6 +615,50 @@ $no = isset($_GET["no"]) ? intval($_GET["no"]) : 0;
 
 // Check if this is a new event (no=0 or action=new)
 $isNewEvent = ($no == 0 || (isset($_GET['action']) && $_GET['action'] == 'new'));
+
+// Check if this is a duplicate action
+$isDuplicate = (isset($_GET['action']) && $_GET['action'] == 'duplicate');
+
+// If duplicating, load source event data and set today's date
+if ($isDuplicate && isset($_GET['source_year']) && isset($_GET['source_month']) && isset($_GET['source_day']) && isset($_GET['source_no'])) {
+	$sourceYear = intval($_GET['source_year']);
+	$sourceMonth = intval($_GET['source_month']);
+	$sourceDay = intval($_GET['source_day']);
+	$sourceNo = intval($_GET['source_no']);
+	
+	// Load source event data
+	$sourceFilename = sprintf("../android/%d-%02d.txt", $sourceYear, $sourceMonth);
+	$sourceFile = fopen($sourceFilename, "r");
+	if ($sourceFile) {
+		$n = 0;
+		$lastDay = "";
+		while ($line = fgets($sourceFile, 8192)) {
+			$tempData = explode("\t", $line);
+			$d = isset($tempData[0]) ? $tempData[0] : '';
+			
+			if ($lastDay != $d) {
+				$n = 1;
+				$lastDay = $d;
+			} else {
+				$n++;
+			}
+			
+			if ($d == $sourceDay && $n == $sourceNo) {
+				// Found the source event - store it
+				$duplicateSourceData = $tempData;
+				break;
+			}
+		}
+		fclose($sourceFile);
+	}
+	
+	// Set to today's date for the duplicate
+	$year = date('Y');
+	$month = date('n');
+	$day = date('j');
+	$no = 0; // New event
+	$isNewEvent = true;
+}
 
 $message = "";
 $messageType = "";
@@ -901,6 +983,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		// Sanitize all inputs
 		$_POST = sanitizeInput($_POST);
 		
+		// Handle custom kennel input
+		if (isset($_POST['kennel']) && $_POST['kennel'] === '--- New Kennel ---') {
+			if (!empty($_POST['kennel_custom'])) {
+				$_POST['kennel'] = trim($_POST['kennel_custom']);
+			} else {
+				$message = "Please enter a name for the new kennel.";
+				$messageType = "error";
+			}
+		}
+		
+		// Only proceed if no kennel error
+		if (empty($message)) {
+		
 		// Get the day from POST (user can select it for new events)
 		$day = intval($_POST['day']);
 		
@@ -1052,6 +1147,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && $isNewEvent
 		$message = "Error: Unable to write to file. Check file permissions.";
 		$messageType = "error";
 	}
+	} // end kennel validation check
 	} // end validation check
 	} // end CSRF check
 }
@@ -1078,6 +1174,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 		
 		// Sanitize all inputs
 		$_POST = sanitizeInput($_POST);
+		
+		// Handle custom kennel input
+		if (isset($_POST['kennel']) && $_POST['kennel'] === '--- New Kennel ---') {
+			if (!empty($_POST['kennel_custom'])) {
+				$_POST['kennel'] = trim($_POST['kennel_custom']);
+			} else {
+				$message = "Please enter a name for the new kennel.";
+				$messageType = "error";
+			}
+		}
+		
+		// Only proceed if no kennel error
+		if (empty($message)) {
 		
 		// Create backup before editing
 		$eventInfo = "EDIT day=$day no=$no kennel=" . $_POST['kennel'];
@@ -1222,6 +1331,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 			$messageType = "error";
 		}
 	}
+	} // end kennel validation check
 	} // end CSRF check
 }
 
@@ -1229,7 +1339,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['save']) && !$isNewEven
 $data = array('', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '');
 $eventsOnThisDay = 0;
 
-if (!$isNewEvent) {
+// If duplicating, use the source data but clear run number
+if ($isDuplicate && isset($duplicateSourceData)) {
+	$data = $duplicateSourceData;
+	$data[4] = ''; // Clear run number
+	// Keep all other fields from source event
+} else if (!$isNewEvent) {
 	$filename = sprintf("../android/%d-%02d.txt", $year, $month);
 	
 	// Count events on this day for prev/next navigation
@@ -1327,6 +1442,8 @@ $nextNo = $no + 1;
 		.btn-logout { background: #666; color: white; border: none; float: right; }
 		.btn-new { background: #2196F3; color: white; border: none; }
 		.btn-delete { background: #dc3545; color: white; border: none; }
+		.btn-duplicate { background: #17a2b8; color: white; border: none; }
+		.btn-duplicate:hover { background: #138496; }
 		.btn-recover { background: #ff9800; color: white; border: none; }
 		.btn-recover:hover { background: #e68900; }
 		.btn-nav { background: #6c757d; color: white; border: none; padding: 8px 15px; font-size: 14px; }
@@ -1490,6 +1607,38 @@ $nextNo = $no + 1;
 			preview.style.display = 'inline-block';
 		} else {
 			preview.style.display = 'none';
+		}
+	}
+	
+	function updateKennelSelection() {
+		var kennelSelect = document.getElementById('kennelSelect');
+		var kennelCustom = document.getElementById('kennelCustom');
+		var iconSelect = document.getElementById('iconSelect');
+		var selectedOption = kennelSelect.options[kennelSelect.selectedIndex];
+		
+		if (kennelSelect.value === '--- New Kennel ---') {
+			// Show custom kennel input
+			kennelCustom.style.display = 'block';
+			kennelCustom.required = true;
+			kennelSelect.required = false;
+		} else {
+			// Hide custom kennel input
+			kennelCustom.style.display = 'none';
+			kennelCustom.required = false;
+			kennelSelect.required = true;
+			
+			// Auto-select default icon if available
+			var defaultIcon = selectedOption.getAttribute('data-icon');
+			if (defaultIcon) {
+				// Find and select the matching icon in the dropdown
+				for (var i = 0; i < iconSelect.options.length; i++) {
+					if (iconSelect.options[i].value === defaultIcon) {
+						iconSelect.selectedIndex = i;
+						updateIconPreview();
+						break;
+					}
+				}
+			}
 		}
 	}
 	
@@ -1687,7 +1836,28 @@ $nextNo = $no + 1;
 			
 			<div class="form-group">
 				<label>Kennel:</label>
-				<input type="text" name="kennel" value="<?php echo htmlspecialchars($data[1]); ?>" required>
+				<select name="kennel" id="kennelSelect" onchange="updateKennelSelection()" required>
+					<option value="">-- Select Kennel --</option>
+					<?php 
+					$kennelList = getKennelList($month, $year);
+					$currentKennel = isset($data[1]) ? trim($data[1]) : '';
+					$kennelFound = false;
+					foreach ($kennelList as $kennelName => $defaultIcon): 
+						$selected = ($currentKennel == $kennelName) ? 'selected' : '';
+						if ($selected) $kennelFound = true;
+					?>
+					<option value="<?php echo htmlspecialchars($kennelName); ?>" data-icon="<?php echo htmlspecialchars($defaultIcon); ?>" <?php echo $selected; ?>>
+						<?php echo htmlspecialchars($kennelName); ?>
+					</option>
+					<?php endforeach; ?>
+					<option value="--- New Kennel ---">--- New Kennel ---</option>
+					<?php if (!$kennelFound && !empty($currentKennel)): ?>
+					<option value="<?php echo htmlspecialchars($currentKennel); ?>" selected>
+						<?php echo htmlspecialchars($currentKennel); ?> (custom)
+					</option>
+					<?php endif; ?>
+				</select>
+				<input type="text" name="kennel_custom" id="kennelCustom" placeholder="Enter new kennel name" style="display: none; margin-top: 5px;">
 			</div>
 			
 			<div class="form-group">
@@ -1861,6 +2031,16 @@ $nextNo = $no + 1;
 			<form method="POST" action="" onsubmit="formChanged = false; return confirmDelete();">
 				<input type="hidden" name="csrf_token" value="<?php echo h(generateCsrfToken()); ?>">
 				<button type="submit" name="delete" class="btn btn-delete">🗑️ Delete Event</button>
+			</form>
+			<br>
+			<p>Create a copy of this event with today's date and no run number.</p>
+			<form method="GET" action="edit.php" style="display: inline;">
+				<input type="hidden" name="action" value="duplicate">
+				<input type="hidden" name="source_year" value="<?php echo $year; ?>">
+				<input type="hidden" name="source_month" value="<?php echo $month; ?>">
+				<input type="hidden" name="source_day" value="<?php echo $day; ?>">
+				<input type="hidden" name="source_no" value="<?php echo $no; ?>">
+				<button type="submit" class="btn btn-duplicate">📋 Duplicate Event</button>
 			</form>
 			<br>
 			<p>Restore a previously deleted event from backup.</p>
