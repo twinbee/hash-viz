@@ -442,6 +442,49 @@ function getKennelList($month = null, $year = null) {
 }
 
 // ============================================
+// HELPER FUNCTION: Get events on a specific day
+// ============================================
+function getEventsOnDay($year, $month, $day) {
+	$filename = sprintf("../android/%d-%02d.txt", $year, $month);
+	$events = array();
+	
+	if (!file_exists($filename)) {
+		return $events;
+	}
+	
+	$file = fopen($filename, "r");
+	if (!$file) {
+		return $events;
+	}
+	
+	$n = 0;
+	$lastDay = "";
+	
+	while ($line = fgets($file, 8192)) {
+		$tempData = explode("\t", $line);
+		$d = isset($tempData[0]) ? $tempData[0] : '';
+		
+		if ($d != $lastDay) {
+			$n = 1;
+		} else {
+			$n += 1;
+		}
+		$lastDay = $d;
+		
+		if ($d == $day) {
+			$events[] = array(
+				'no' => $n,
+				'kennel' => isset($tempData[1]) ? $tempData[1] : '',
+				'time' => isset($tempData[6]) ? $tempData[6] : ''
+			);
+		}
+	}
+	fclose($file);
+	
+	return $events;
+}
+
+// ============================================
 // EDIT LOCK SYSTEM - Track who is editing what
 // ============================================
 define('LOCK_DIR', dirname(__FILE__) . '/locks');
@@ -607,6 +650,18 @@ function stripslashes_deep($value) {
 // ============================================
 // MAIN SCRIPT
 // ============================================
+
+// Handle AJAX request for events on a day
+if (isset($_GET['get_events_on_day'])) {
+	$year = isset($_GET['year']) ? intval($_GET['year']) : date('Y');
+	$month = isset($_GET['month']) ? intval($_GET['month']) : date('n');
+	$day = isset($_GET['day']) ? intval($_GET['day']) : date('j');
+	
+	header('Content-Type: application/json');
+	$events = getEventsOnDay($year, $month, $day);
+	echo json_encode($events);
+	exit;
+}
 
 $year = isset($_GET["year"]) ? intval($_GET["year"]) : date('Y');
 $month = isset($_GET["month"]) ? intval($_GET["month"]) : date('n');
@@ -1642,6 +1697,91 @@ $nextNo = $no + 1;
 		}
 	}
 	
+	function updateDatePreview() {
+		var monthSelect = document.getElementById('monthSelect');
+		var daySelect = document.getElementById('daySelect');
+		var yearSelect = document.getElementById('yearSelect');
+		var dayOfWeekSpan = document.getElementById('dayOfWeek');
+		var otherEventsSpan = document.getElementById('otherEvents');
+		
+		if (!monthSelect || !daySelect || !yearSelect) return;
+		
+		var month = parseInt(monthSelect.value);
+		var day = parseInt(daySelect.value);
+		var year = parseInt(yearSelect.value);
+		
+		// Calculate day of week
+		var date = new Date(year, month - 1, day);
+		var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+		var dayName = days[date.getDay()];
+		
+		dayOfWeekSpan.textContent = 'This is a ' + dayName + '. ';
+		
+		// Fetch events on this day via AJAX
+		var xhr = new XMLHttpRequest();
+		xhr.open('GET', '?get_events_on_day=1&year=' + year + '&month=' + month + '&day=' + day, true);
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState === 4 && xhr.status === 200) {
+				try {
+					var events = JSON.parse(xhr.responseText);
+					if (events.length === 0) {
+						otherEventsSpan.innerHTML = 'No other events on this day.';
+					} else {
+						var count = events.length;
+						var links = [];
+						for (var i = 0; i < events.length; i++) {
+							var evt = events[i];
+							var url = year + '/event.php?year=' + year + '&month=' + month + '&day=' + day + '&no=' + evt.no;
+							links.push('<a href="' + url + '" target="_blank">' + evt.kennel + '</a>');
+						}
+						otherEventsSpan.innerHTML = count + ' Other Event' + (count > 1 ? 's' : '') + ': ' + links.join(', ');
+					}
+				} catch (e) {
+					otherEventsSpan.textContent = '';
+				}
+			}
+		};
+		xhr.send();
+	}
+	
+	function autoGenMapLink() {
+		// Get address from textarea
+		var addressField = document.getElementById('addressField');
+		var maplinkField = document.getElementById('maplinkInput');
+		
+		if (!addressField || !maplinkField) {
+			alert('Could not find address or map link field.');
+			return;
+		}
+		
+		var address = addressField.value.trim();
+		
+		if (!address) {
+			alert('Please enter an address first.');
+			addressField.focus();
+			return;
+		}
+		
+		// Clean up address for URL encoding
+		// Remove line breaks and extra spaces
+		address = address.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+		
+		// Generate Google Maps link
+		var googleMapsUrl = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
+		
+		// Set the map link field
+		maplinkField.value = googleMapsUrl;
+		
+		// Mark form as changed
+		formChanged = true;
+		
+		// Visual feedback
+		maplinkField.style.background = '#d4edda';
+		setTimeout(function() {
+			maplinkField.style.background = '';
+		}, 1000);
+	}
+	
 	function confirmDelete() {
 		return confirm('Are you sure you want to delete this event?\n\nThis action cannot be undone (but a backup will be created).');
 	}
@@ -1696,6 +1836,20 @@ $nextNo = $no + 1;
 				inputs[i].addEventListener('change', markChanged);
 				inputs[i].addEventListener('keyup', markChanged);
 			}
+		}
+		
+		// Add date preview update listeners for new events
+		var monthSelect = document.getElementById('monthSelect');
+		var daySelect = document.getElementById('daySelect');
+		var yearSelect = document.getElementById('yearSelect');
+		
+		if (monthSelect && daySelect && yearSelect) {
+			monthSelect.addEventListener('change', updateDatePreview);
+			daySelect.addEventListener('change', updateDatePreview);
+			yearSelect.addEventListener('change', updateDatePreview);
+			
+			// Initial update
+			updateDatePreview();
 		}
 	};
 	</script>
@@ -1831,6 +1985,10 @@ $nextNo = $no + 1;
 					</select>
 				</div>
 				<small style="color: #666;">You can create events from <?php echo $currentYear; ?> through 2050.</small>
+			<div id="datePreview" style="margin-top: 10px; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+				<strong id="dayOfWeek"></strong>
+				<span id="otherEvents"></span>
+			</div>
 			</div>
 			<?php endif; ?>
 			
@@ -1906,7 +2064,7 @@ $nextNo = $no + 1;
 			
 			<div class="form-group">
 				<label>Address:</label>
-				<textarea name="address"><?php 
+				<textarea name="address" id="addressField"><?php 
 					$addr = isset($data[7]) ? $data[7] : '';
 					$addr = str_replace("<br />", "\n", $addr);
 					$addr = str_replace("<br/>", "\n", $addr);
@@ -1917,7 +2075,11 @@ $nextNo = $no + 1;
 			
 			<div class="form-group">
 				<label>Map Link:</label>
-				<input type="text" name="maplink" value="<?php echo htmlspecialchars(isset($data[8]) ? $data[8] : ''); ?>">
+				<div style="display: flex; gap: 10px; align-items: center;">
+					<input type="text" name="maplink" id="maplinkInput" value="<?php echo htmlspecialchars(isset($data[8]) ? $data[8] : ''); ?>" style="flex: 1;">
+					<button type="button" onclick="autoGenMapLink()" class="btn" style="background: #28a745; color: white; padding: 8px 15px; white-space: nowrap;">🗺️ AutoGen</button>
+				</div>
+				<small style="color: #666;">Click AutoGen to create a Google Maps link from the address above.</small>
 			</div>
 			
 			<div class="form-group">
