@@ -1,0 +1,20 @@
+DAY	KENNEL	ICON	TITLE	RUN	HARES	TIME	START	MAP	HASHCASH	TURDS	TWEET	TWILIGHT	DATE	DESC	UPDATE
+01	Bike Hash	bikeHash.png				1:00 PM			$3.00						
+02	Contra Hash	contra.svg				3:00 PM			BYOB						
+03	Dallas Hash	dallas.png				3:00 PM			$7.00						
+04	Dallas Urban Mountain Bike Hash	DUMB.png				7:00 PM CST			Pay-as-you-go						
+05	Dallas Urban Hash	DUH.png				7:00 PM			$7.00						
+06	Campout	dallasCamp.png				7:00 PM									12/15/25 20:48 (kitchen)
+07	No-No-DUH	nonoduh.png				7:00 PM			$0, drink mine or BYOE!						12/16/25 8:14 (kitchen)
+08	Full Moon	fullmoon.png				7:00 PM			BYOB						
+09	Fort Worth Hash	ftworth.png				3:00 PM			$7.00 &mdash; BYOB prelube beer						
+10	Grapevine Quarterly	GQhash.png				7:00 PM			BYOB						
+11	Happy Birthday Happy Hour	happyBirthday.png				7:00 PM									
+12	Happy Hour	happy3.png				7:00 PM									
+13	Movie Night	Movie.png			Anal Thrax<br />I-I-I	6:00 PM	<br />Los Lupes & AMC 14<br />Irving Mall<br />3644 Irving Mall<br />Irving, TX 75062	https://www.google.com/maps/place/Irving+Mall/@32.8403959,-96.9966674,17z/data=!3m1!4b1!4m2!3m1!1s0x864e822d65725267:0xc2134946d94956ad						Anal Thrax – Movie HH at Los Lupes at 6:00 or sooner.  HH prices until 7:00.  <br /><br />(same location as Fuddruckers). This place is busy, it’s hopping. A great place.<br /><br />Then see “XXXXXX” at Irving Mall AMC!  Deets on showtime coming!	
+14	NODUH Hash	NoDHHH2.png				7:00 PM			$7.00						
+15	Poker Night	poker.png				7:00 PM			BYOB						
+16	Sunday Brunch	Brunch.png				11:00 AM									
+17	Spit Hash	spit.png				7:00 PM			BYOB						
+18	Trivia Tuesdays	triviaTuesdays.png	Malarkey’s Tavern		Team H<sup>3</sup>	7:00 PM	<br /><br /><a href="http://www.malarkeystavern.com/">Malarkey's Tavern</a><br /><br />4460 Trinity Mills Rd<br />Dallas, TX 75287	https://www.google.com/maps/place/Malarkey%27s+Tavern/@32.989746,-96.831213,17z/data=!3m1!4b1!4m2!3m1!1s0x864c23f9148e0fcb:0x3d508e132e71713d						Tonight is Trivia Tuesday at Malarkey's off Tollway and Trinity Mills. Starts at 7:30. Cum play with us. Also get there early if you can. Hope to see you tonight!	
+19	7-ELEVEn Hash	7-11 (Custom) (1).png				7:00 PM Meet, 7:11 PM Pack Away, done by 11 PM	7-ELEVEn		$7.11 per SEVEn 7-ELEVEn stops. PAYG	Yes				This is the innagural running of the Dallas / Ft Worth 7-ELEVEn Hash House Harriers! (an international kennel running on this date)<br /><br /><u>Rules:</u><br /><br />Wear green and orange, any 7-ELEVEn apparel you have. Bring duct tape or money to buy it at a 7-ELEVEn.<br /><br />Every beer check must be at a 7-ELEVEn!<br /><br />There is one song and one song only; \"Seven-eleven, down down!\"<br /><br />Announcements: the next 7/11 hash is - as always on 7/11 at a 7/11.<br /><br />Declare the wisest wizard by counting the number of beers or alcoholic drinks they have taped together in their wizard staff. the coffee you drank and taped on doesn\'t count.<br /><br />Bow with staffs in the direction of the closest 7/11 with one last song.<br /><br />Wizard staff jousting / sword fights afterwards.	12/16/25 8:30 (kitchen)
