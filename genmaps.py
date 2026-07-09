@@ -127,12 +127,23 @@ def near_dallas(lat, lon):
         return False
 
 
+NSEW_RE = re.compile(r"(\d{1,2}\.\d{3,})\s*([NS])\s*(\d{2,3}\.\d{3,})\s*([EW])",
+                     re.IGNORECASE)
+
+
 def parse_latlon(text):
-    """Raw 'lat, lon' embedded anywhere in a string (DFW-plausible only)."""
-    for m in LATLON_RE.finditer(text or ""):
+    """Raw 'lat, lon' (or '33.64N 97.37W') embedded in a string; DFW-plausible only."""
+    t = text or ""
+    for m in LATLON_RE.finditer(t):
         lat, lon = float(m.group(1)), float(m.group(2))
         # DFW is ~ +32, -96/-97.  Guard against zip codes etc.
         if 30 <= lat <= 35 and -99 <= lon <= -94 and near_dallas(lat, lon):
+            return (lat, lon)
+    m = NSEW_RE.search(t)
+    if m:
+        lat = float(m.group(1)) * (1 if m.group(2).upper() == "N" else -1)
+        lon = float(m.group(3)) * (1 if m.group(4).upper() == "E" else -1)
+        if near_dallas(lat, lon):
             return (lat, lon)
     return None
 
@@ -172,16 +183,16 @@ def needs_expand(url):
 def expand_url(url, ucache):
     if url in ucache:
         return ucache[url]
-    result = url
-    try:
-        r = requests.head(url, allow_redirects=True, timeout=10,
-                          headers={"User-Agent": UA})
-        if r.status_code < 400:
-            result = r.url
-        else:
-            result = None
-    except requests.RequestException:
-        result = None
+    result = None
+    for method in (requests.head, requests.get):
+        try:
+            r = method(url, allow_redirects=True, timeout=12,
+                       headers={"User-Agent": UA})
+            if r.status_code < 400:
+                result = r.url
+                break
+        except requests.RequestException:
+            continue
     ucache[url] = result
     return result
 
@@ -301,13 +312,17 @@ def resolve(start_raw, map_raw, ccache, ucache, geocode_fn, retry_failed):
         v = ccache[key]
         return (tuple(v) if v else None), "cache"
 
-    # 1. raw lat/lon or plus code sitting in the START text
-    c = parse_latlon(start) or parse_pluscode(start)
+    # 1. raw lat/lon or plus code sitting in the START text, or in the MAP value
+    #    (some MAP values are e.g. "...q=33.6483N97.3798W(Muenster...")
+    c = parse_latlon(start) or parse_pluscode(start) or parse_latlon(mp)
     method = "latlon/plus" if c else None
 
-    # 2. the map link
-    if not c and mp and mp.upper() != "MAP" and mp.startswith(("http://", "https://")):
-        url = expand_url(mp, ucache) if needs_expand(mp) else mp
+    # 2. the map link -- pull the first real URL out of the value first, since
+    #    some are prefixed/suffixed with stray "<br />" markup.
+    urlmatch = re.search(r"https?://[^\s\"'<>]+", mp) if mp else None
+    if not c and urlmatch and mp.upper() != "MAP":
+        raw = urlmatch.group(0).rstrip(").,")
+        url = expand_url(raw, ucache) if needs_expand(raw) else raw
         if url:
             c = coords_from_url(url)
             method = "url-coords" if c else None
@@ -444,6 +459,11 @@ def main():
     # purge known-bad legacy cache entries (e.g. 'TBD' -> India)
     for bad in ("TBD",):
         ccache.pop(bad, None)
+    # on a retry pass, forget failed URL expansions so they are re-fetched
+    # with the current (GET-capable) logic
+    if args.retry_failed:
+        for u in [u for u, v in ucache.items() if v is None]:
+            ucache.pop(u, None)
 
     events = read_events(args.android_dir, cut_year, cut_month)
     print(f"Read {len(events)} events through {args.cut}")
